@@ -49,6 +49,16 @@ void Send (Ptr<BundleProtocol> sender, uint32_t size, BpEndpointId src, BpEndpoi
   sender->Send (packet, src, dst);
 }
 
+void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, BpEndpointId dst)
+{
+  NS_LOG_INFO ("Sendpacket(...) called.");
+  uint32_t size = strlen(data);
+  std::cout << Simulator::Now ().GetMilliSeconds () << " Send a PDU with size " << size << "; containing: " << data << std::endl;
+
+  Ptr<Packet> packet = Create<Packet> (reinterpret_cast<const uint8_t*>(data), size);
+  sender->Send_packet (packet, src, dst);
+}
+
 void Receive (Ptr<BundleProtocol> receiver, BpEndpointId eid)
 {
 
@@ -57,6 +67,26 @@ void Receive (Ptr<BundleProtocol> receiver, BpEndpointId eid)
   while (p != NULL)
     {
       std::cout << Simulator::Now ().GetMilliSeconds () << " Receive bundle size " << p->GetSize () << std::endl;
+      p = receiver->Receive (eid);
+    }
+}
+
+void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
+{
+
+  Ptr<Packet> p = receiver->Receive (eid);
+  NS_LOG_INFO ("Receive(..) called.");
+  while (p != NULL)
+    {
+      uint32_t size = p->GetSize();
+      std::cout << Simulator::Now ().GetMilliSeconds () << " Receive bundle size " << size << std::endl;
+      char* buffer = new char[p->GetSize()+1];
+      p->CopyData(reinterpret_cast<uint8_t*>(buffer), size);
+      buffer[size] = '\0'; // Null terminating char_array to ensure cout doesn't overrun when printing
+      std::cout << "Data received: " << buffer << std::endl;
+
+      delete [] buffer;
+      // Try to get another packet
       p = receiver->Receive (eid);
     }
 }
@@ -127,8 +157,9 @@ main (int argc, char *argv[])
   bpReceivers.Stop (Seconds (1.0));
 
   // send 1000 bytes bundle 
-  uint32_t size = 1000;  // -- This should be broken into three segments:  400, 400, 200
-  Simulator::Schedule (Seconds (0.2), &Send, bpSenders.Get (0), size, eidSender, eidRecv);  
+  
+  //uint32_t size = 1000;  // -- This should be broken into three segments:  400, 400, 200
+  //Simulator::Schedule (Seconds (0.2), &Send, bpSenders.Get (0), size, eidSender, eidRecv);  
   // -- above triggers the 'send' function at 0.2 sec mark, sent by the sender, with a specified size, by the sender ID, to the receiver ID
   /* -- Questions:  
     What does the bundle contain?
@@ -136,8 +167,18 @@ main (int argc, char *argv[])
     Where is the application interface?
     Is this the official way to interface with BP or just a simple test?
   */
+  // Sending a bundle packet of data
+  //char data[] = "Books serve to show a man that those original thoughts of his aren't very new after all.";
+  char data[] = "Mr. Chairman, this movement is exclusively the work of politicians; "
+                "a set of men who have interests aside from the interests of the people, and who, "
+                "to say the most of them, are, taken as a mass, at least one long step removed from "
+                "honest men. I say this with the greater freedom because, being a politician myself, "
+                "none can regard it as personal.";
+    NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);
+  Simulator::Schedule (Seconds (0.2), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);  
+
   // receive function
-  Simulator::Schedule (Seconds (0.8), &Receive, bpReceivers.Get (0), eidRecv);
+  Simulator::Schedule (Seconds (0.8), &Receive_char_array, bpReceivers.Get (0), eidRecv);
 
   if (tracing)
     {
