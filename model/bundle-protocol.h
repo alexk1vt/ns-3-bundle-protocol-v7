@@ -172,6 +172,12 @@ public:
    */
   virtual int Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst);
 
+  /* Function to provide a file path - File will be read, possibly fragmented, and sent to destination EID
+  * Receiving end will still call Receive(..) and receive packets as they come in.  It's up to them on what they do with the data (save as file, etc...).
+  * Will need to ensure bundle/packet sequencing is performed whereever the RFC requires
+  */
+  virtual int Send_file (std::string file_path, const BpEndpointId &src, const BpEndpointId &dst);
+
   /*
    * Ultimately going to replace existing 'Send(...)' function as it receives an
    * NS-3 packet of data and copies the contents into the bundle payload

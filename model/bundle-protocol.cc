@@ -197,6 +197,20 @@ BundleProtocol::Bind (const BpEndpointId &eid)
     }
 }
 
+int
+BundleProtocol::Send_file (std::string file_path, const BpEndpointId &src, const BpEndpointId &dst)
+{
+  // reference value of m_bundleSize for fragmenting
+  // can I just read the file and store into an NS-3 packet, then call Send_packet?  what's the upper-limit on NS-3 packet sizes?
+
+  // Otherwise I'll need to build my own header and such.  Work that should be performed by underlying layers...
+  return 0;
+}
+
+/*
+* NOTE:  Send(..) will be replaced by contents of Send_packet(..) once it has been fully vetted.
+* Do not rely on /reference this code for future development - reference Send_packet(..) instead
+*/
 int 
 BundleProtocol::Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst)
 { 
@@ -321,6 +335,8 @@ BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEnd
   uint32_t total = p->GetSize ();
   uint32_t offset = 0;
   bool fragment =  ( total > m_bundleSize ) ? true : false;
+
+  NS_LOG_FUNCTION("Received PDU of size: " << total << "; max bundle size is: " << m_bundleSize << (( total > m_bundleSize ) ? "Fragmenting" : "No Fragmenting"));
 
   // a simple fragementation: ensure a bundle is transmittd by one packet at the transport layer
   uint32_t num = 0;

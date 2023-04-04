@@ -53,8 +53,7 @@ void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, 
 {
   NS_LOG_INFO ("Sendpacket(...) called.");
   uint32_t size = strlen(data);
-  std::cout << Simulator::Now ().GetMilliSeconds () << " Send a PDU with size " << size << "; containing: " << data << std::endl;
-
+  std::cout << Simulator::Now ().GetMilliSeconds () << " Send a PDU with size " << size << ", containing:" << std::endl << data << std::endl;
   Ptr<Packet> packet = Create<Packet> (reinterpret_cast<const uint8_t*>(data), size);
   sender->Send_packet (packet, src, dst);
 }
@@ -83,7 +82,7 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
       char* buffer = new char[p->GetSize()+1];
       p->CopyData(reinterpret_cast<uint8_t*>(buffer), size);
       buffer[size] = '\0'; // Null terminating char_array to ensure cout doesn't overrun when printing
-      std::cout << "Data received: " << buffer << std::endl;
+      std::cout << "Data received: " << std::endl << buffer << std::endl;
 
       delete [] buffer;
       // Try to get another packet
@@ -169,12 +168,40 @@ main (int argc, char *argv[])
   */
   // Sending a bundle packet of data
   //char data[] = "Books serve to show a man that those original thoughts of his aren't very new after all.";
+  /*
   char data[] = "Mr. Chairman, this movement is exclusively the work of politicians; "
                 "a set of men who have interests aside from the interests of the people, and who, "
                 "to say the most of them, are, taken as a mass, at least one long step removed from "
                 "honest men. I say this with the greater freedom because, being a politician myself, "
                 "none can regard it as personal.";
-    NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);
+  */
+  
+  char data[] = "The Senate of the United States shall be composed of two Senators from each State, "
+                "chosen by the Legislature thereof, for six Years; and each Senator shall have one Vote."
+                "Immediately after they shall be assembled in Consequence of the first Election, they shall"
+                " be divided as equally as may be into three Classes. The Seats of the Senators of the"
+                " first Class shall be vacated at the Expiration of the second Year, of the second Class at"
+                " the Expiration of the fourth Year, and of the third Class at the Expiration of the sixth"
+                " Year, so that one third may be chosen every second Year; and if Vacancies happen by "
+                "Resignation, or otherwise, during the Recess of the Legislature of any State, the Executive"
+                " thereof may make temporary Appointments until the next Meeting of the Legislature, which"
+                " shall then fill such Vacancies. No Person shall be a Senator who shall not have attained"
+                " to the Age of thirty Years, and been nine Years a Citizen of the United States, and who"
+                " shall not, when elected, be an Inhabitant of that State for which he shall be chosen."
+                "The Vice President of the United States shall be President of the Senate, but shall have "
+                "no Vote, unless they be equally divided.  The Senate shall chuse their other Officers, "
+                "and also a President pro tempore, in the Absence of the Vice President, or when he shall"
+                " exercise the Office of President of the United States. The Senate shall have the sole "
+                "Power to try all Impeachments. When sitting for that Purpose, they shall be on Oath or"
+                " Affirmation. When the President of the United States is tried, the Chief Justice shall"
+                " preside: And no Person shall be convicted without the Concurrence of two thirds of the "
+                "Members present. Judgment in Cases of Impeachment shall not extend further than to removal"
+                " from Office, and disqualification to hold and enjoy any Office of honor, Trust or Profit"
+                " under the United States: but the Party convicted shall nevertheless be liable and subject"
+                " to Indictment, Trial, Judgment and Punishment, according to Law.";
+
+
+  NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);
   Simulator::Schedule (Seconds (0.2), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);  
 
   // receive function
