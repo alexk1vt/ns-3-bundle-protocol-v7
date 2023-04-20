@@ -114,7 +114,7 @@ main (int argc, char *argv[])
   InternetStackHelper internet; // -- More NS-3 stuff, also need to understand
   internet.Install (nodes);
 
-  NS_LOG_INFO ("Assign IP Addresses.");
+  NS_LOG_INFO ("Assign IP Addresses.");  // -- this BP implementation requires IP based networks - issue?
   Ipv4AddressHelper ipv4;
   ipv4.SetBase ("10.1.1.0", "255.255.255.0");
   Ipv4InterfaceContainer i = ipv4.Assign (devices); // -- Assuming NS-3 is assinging IPv4 IPs within the specified network to each node in Devices
@@ -134,12 +134,14 @@ main (int argc, char *argv[])
 
   // set bundle static routing
   Ptr<BpStaticRoutingProtocol> route = CreateObject<BpStaticRoutingProtocol> ();
-  route->AddRoute (eidSender, InetSocketAddress (i.GetAddress (0), 9));
-  route->AddRoute (eidRecv, InetSocketAddress (i.GetAddress (1), 9));
+  route->AddRoute (eidSender, InetSocketAddress (i.GetAddress (0), 9));  // -- this is valid for direct connection
+  route->AddRoute (eidRecv, InetSocketAddress (i.GetAddress (1), 9));  // -- ditto; otherwise would need to provide ipv4 address of next hop
 
   // sender  
   // -- So each BP node is assigned a routing protocol (with static/dynamic routes)
   // -- Need to ensure seperation from BP routes and CL routes --> look into RFCs!
+
+  // -- are the endpoints being registered here?  How do endpoints get discovered across a network?
   BundleProtocolHelper bpSenderHelper;
   bpSenderHelper.SetRoutingProtocol (route);
   bpSenderHelper.SetBpEndpointId (eidSender);

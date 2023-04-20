@@ -132,12 +132,21 @@ BundleProtocol::SetBpEndpointId (BpEndpointId eid)
   m_eid = eid;
 }
 
+int
+BundleProtocol::ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri ());
+  BpRegisterInfo info;
+  info.lifetime = lifetime;
+  info.state = state;
+  return Register (eid, info);
+}
+
 int 
 BundleProtocol::Register (const BpEndpointId &eid, const struct BpRegisterInfo &info)
 { 
   NS_LOG_FUNCTION (this << " " << eid.Uri ());
-  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.end ();
-  it = BpRegistration.find (eid);
+  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.find (eid);
   if (it == BpRegistration.end ())
     {
       // insert a registration of local endpoint id in the registration storage
@@ -430,6 +439,42 @@ BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEnd
 }
 
 int
+BundleProtocol::ForwardBundle (Ptr<Packet> bundle)
+{
+  NS_LOG_FUNCTION (this << " " << bundle);
+  BpHeader bpHeader;         // primary bundle header
+  bundle->PeekHeader (bpHeader);
+  BpEndpointId src = bpHeader.GetSourceEid ();
+
+  // store the bundle into persistant sent storage
+  std::map<BpEndpointId, std::queue<Ptr<Packet> > >::iterator it = BpSendBundleStore.end ();
+  it = BpSendBundleStore.find (src);
+  if ( it == BpSendBundleStore.end ())
+    {
+      // this is the first packet sent by this source endpoint id
+      std::queue<Ptr<Packet> > qu;
+      qu.push (bundle);
+      BpSendBundleStore.insert (std::pair<BpEndpointId, std::queue<Ptr<Packet> > > (src, qu) );
+    }
+  else
+    {
+      // ongoing packet
+      (*it).second.push (bundle);
+    }
+
+  if (m_cla)
+    {
+        m_cla->SendPacket (bundle);                             
+    }
+  else
+  {
+    NS_FATAL_ERROR ("BundleProtocol::ForwardBundle (): undefined m_cla");
+    return -1;
+  }
+  return 0;
+}
+
+int
 BundleProtocol::Close (const BpEndpointId &eid)
 {
   NS_LOG_FUNCTION (this << " " << eid.Uri ());
@@ -473,19 +518,20 @@ BundleProtocol::RetreiveBundle ()
 
       // copy m_bpRxBufferPacket into a Buffer
       uint32_t size = m_bpRxBufferPacket->GetSize();
-      uint8_t *buffer = (uint8_t*)std::malloc(size);
+      //uint8_t *buffer = (uint8_t*)std::malloc(size);
 
-      m_bpRxBufferPacket->CopyData (buffer, size); 
+      //m_bpRxBufferPacket->CopyData (buffer, size); 
 
-      Buffer buf;
-      buf.AddAtStart (size);
-      Buffer::Iterator start = buf.Begin ();
-      start.Write (buffer, size);
+      //Buffer buf;
+      //buf.AddAtStart (size);
+      //Buffer::Iterator start = buf.Begin ();
+      //start.Write (buffer, size);
  
       // if there is not data, we cannot call PeekHeader, since we cannot guarantee a complete primary bundle header and 
       // bundle header is received
 
-      if (buf.GetSize () == 0 ){
+      //if (buf.GetSize () == 0 ){
+      if (size == 0 ){
         NS_LOG_DEBUG (this << " Received buffer was size 0. Returning");
         return;
       }
@@ -558,11 +604,10 @@ BundleProtocol::ProcessBundle (Ptr<Packet> bundle)
                               " packet size " << bundle->GetSize ());
 
   // the destination endpoint eid is registered? 
-  // TBD: forwarding case
-  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.end ();
-  it = BpRegistration.find (dst);
+  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.find (dst);
   if (it == BpRegistration.end ())
     {
+      NS_LOG_FUNCTION ("Attempting to process bundle for eid: " << dst.Uri() << " which is not registered with current registration.  Dropping");
       // the destination endpoint id is not registered, drop packet
       return;
     } 
@@ -570,7 +615,16 @@ BundleProtocol::ProcessBundle (Ptr<Packet> bundle)
     {
       // TBD: the lifetime of the eid is expired?
     }
-
+  if (dst != this->m_eid)
+  {
+    // destination is registered and not the current node, so forwarding
+    NS_LOG_FUNCTION ("Received bundle for eid: " << dst.Uri() << ". Current eid is: " << this->m_eid.Uri() << ". Forwarding bundle");
+    if (ForwardBundle(bundle) < 0)
+    {
+      NS_LOG_FUNCTION ("Forwarding of bundle to eid: " << dst.Uri() << " failed.  Bundle dropped");
+    }
+    return;
+  }
   // store the bundle into persistant received storage
   std::map<BpEndpointId, std::queue<Ptr<Packet> > >::iterator itMap = BpRecvBundleStore.end ();
   itMap = BpRecvBundleStore.find (dst);
@@ -595,8 +649,7 @@ BundleProtocol::Receive (const BpEndpointId &eid)
   NS_LOG_FUNCTION (this << " " << eid.Uri ());
   Ptr<Packet> emptyPacket = NULL;
 
-  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.end ();
-  it = BpRegistration.find (eid);
+  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.find (eid);
   if (it == BpRegistration.end ())
     {
       // the eid is not registered
@@ -672,17 +725,20 @@ Ptr<Packet>
 BundleProtocol::GetBundle (const BpEndpointId &src)
 { 
   NS_LOG_FUNCTION (this << " " << src.Uri ());
-  std::map<BpEndpointId, std::queue<Ptr<Packet> > >::iterator it = BpSendBundleStore.end ();
-  it = BpSendBundleStore.find (src);
+  std::map<BpEndpointId, std::queue<Ptr<Packet> > >::iterator it = BpSendBundleStore.find (src); 
+  //it = BpSendBundleStore.find (src);
   if ( it == BpSendBundleStore.end ())
     {
+      NS_LOG_FUNCTION (this << " Did not find bundle in SendBundleStore with uri: " << src.Uri ());
       return NULL;
     }
   else
     {
       if ( ((*it).second).size () == 0)
+      {
+        NS_LOG_FUNCTION (this << " Found queue SendBundleStore for uri: " << src.Uri () << " but is empty");
         return NULL;
-
+      }
       Ptr<Packet> packet = ((*it).second).front ();
       ((*it).second).pop ();
 

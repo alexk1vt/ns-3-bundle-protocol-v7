@@ -80,6 +80,8 @@ public:
    */
   virtual void Open (Ptr<Node> node);
 
+  int ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state);
+
   /**
    * \brief Register a local endpoint id in the bundle protocol
    *
@@ -190,6 +192,8 @@ public:
    * \param eid endpoint id to be removed
    */
   virtual int Close (const BpEndpointId &eid);  
+
+  int ForwardBundle (Ptr<Packet> bundle);
 
   /**
    *  \brief Receive bundle with dst eid

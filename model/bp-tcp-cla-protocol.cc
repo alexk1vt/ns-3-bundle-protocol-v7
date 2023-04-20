@@ -96,17 +96,16 @@ BpTcpClaProtocol::GetL4Socket (Ptr<Packet> packet)
   BpEndpointId dst = bph.GetDestinationEid ();
   BpEndpointId src = bph.GetSourceEid ();
 
-  std::map<BpEndpointId, Ptr<Socket> >::iterator it = m_l4SendSockets.end ();
-  it = m_l4SendSockets.find (src);
+  std::map<BpEndpointId, Ptr<Socket> >::iterator it = m_l4SendSockets.find (src);
   if (it == m_l4SendSockets.end ())
-    {
+  {
       // enable a tcp connection from the src endpoint id to the dst endpoint id
       if (EnableSend (src, dst) < 0)
         return NULL;
-    }
 
-  // update because EnableSende () add new socket into m_l4SendSockets
-  it = m_l4SendSockets.find (src);
+      // update because EnableSende () add new socket into m_l4SendSockets
+      it = m_l4SendSockets.find (src);
+  }
 
   return ((*it).second);
 }
@@ -133,7 +132,7 @@ BpTcpClaProtocol::SendPacket (Ptr<Packet> packet)
       socket->Send (pkt);
       return 0;
     }
-
+  NS_LOG_FUNCTION (this << " Unable to get bundle for eid: " << src.Uri ());
   return -1;
 }
 
@@ -227,8 +226,7 @@ BpTcpClaProtocol::EnableSend (const BpEndpointId &src, const BpEndpointId &dst)
   SetL4SocketCallbacks (socket);
 
   // store the sending socket so that the convergence layer can dispatch the hundles to different tcp connections
-  std::map<BpEndpointId, Ptr<Socket> >::iterator it = m_l4SendSockets.end ();
-  it = m_l4SendSockets.find (src);
+  std::map<BpEndpointId, Ptr<Socket> >::iterator it = m_l4SendSockets.find (src);
   if (it == m_l4SendSockets.end ())
     m_l4SendSockets.insert (std::pair<BpEndpointId, Ptr<Socket> >(src, socket));  
   else

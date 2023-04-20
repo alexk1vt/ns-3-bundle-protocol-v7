@@ -54,7 +54,7 @@ BpStaticRoutingProtocol::SetBundleProtocol (Ptr<BundleProtocol> bundleProtocol)
 }
 
 int 
-BpStaticRoutingProtocol::AddRoute (BpEndpointId eid, InetSocketAddress address)
+BpStaticRoutingProtocol::AddRoute (BpEndpointId eid, InetSocketAddress address) // -- so the address is the exit interface for the given endpoint id?
 { 
   NS_LOG_FUNCTION (this << " " << eid.Uri () << " " << address.GetIpv4 () << " " << address.GetPort ());
   std::map <BpEndpointId, InetSocketAddress>::iterator it = m_routeMap.end ();
