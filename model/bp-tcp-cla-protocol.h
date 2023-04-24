@@ -175,6 +175,10 @@ public:
    */
   void DataRecv (Ptr<Socket> socket);
 
+  virtual int setL4Address (BpEndpointId eid, InetSocketAddress l4Address);
+
+  virtual InetSocketAddress getL4Address (BpEndpointId eid);
+
 private:
 
   /**
@@ -188,6 +192,7 @@ private:
   Ptr<BundleProtocol> m_bp;                             /// bundle protocol
   std::map<BpEndpointId, Ptr<Socket> > m_l4SendSockets; /// the transport layer sender sockets
   std::map<BpEndpointId, Ptr<Socket> > m_l4RecvSockets; /// the transport layer receiver sockets
+  std::map<BpEndpointId, InetSocketAddress> m_l4Addresses; /// the registered node socket addresses
 
   Ptr<BpRoutingProtocol> m_bpRouting;                   /// bundle routing protocol
 };

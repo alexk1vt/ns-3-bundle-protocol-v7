@@ -134,8 +134,8 @@ main (int argc, char *argv[])
 
   // set bundle static routing
   Ptr<BpStaticRoutingProtocol> route = CreateObject<BpStaticRoutingProtocol> ();
-  route->AddRoute (eidSender, InetSocketAddress (i.GetAddress (0), 9));  // -- this is valid for direct connection
-  route->AddRoute (eidRecv, InetSocketAddress (i.GetAddress (1), 9));  // -- ditto; otherwise would need to provide ipv4 address of next hop
+  //route->AddRoute (eidSender, InetSocketAddress (i.GetAddress (0), 9));  // -- this is valid for direct connection
+  //route->AddRoute (eidRecv, InetSocketAddress (i.GetAddress (1), 9));  // -- ditto; otherwise would need to provide ipv4 address of next hop
 
   // sender  
   // -- So each BP node is assigned a routing protocol (with static/dynamic routes)

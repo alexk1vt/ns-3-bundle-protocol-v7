@@ -141,7 +141,12 @@ BpTcpClaProtocol::EnableReceive (const BpEndpointId &local)
 { 
   NS_LOG_FUNCTION (this << " " << local.Uri ());
   Ptr<BpStaticRoutingProtocol> route = DynamicCast <BpStaticRoutingProtocol> (m_bpRouting);
-  InetSocketAddress addr = route->GetRoute (local);
+  //InetSocketAddress addr = route->GetRoute (local);
+  BpEndpointId next_hop = route->GetRoute (local);
+  InetSocketAddress addr = getL4Address(next_hop);
+  InetSocketAddress badAddr ("1.0.0.1", 0);
+  if (addr == badAddr)
+    return -1;
 
   uint16_t port;
   InetSocketAddress defaultAddr ("127.0.0.1", 0);
@@ -205,7 +210,8 @@ BpTcpClaProtocol::EnableSend (const BpEndpointId &src, const BpEndpointId &dst)
   // TBD: do not use dynamicast here
   // check route for destination endpoint id
   Ptr<BpStaticRoutingProtocol> route = DynamicCast <BpStaticRoutingProtocol> (m_bpRouting);
-  InetSocketAddress address = route->GetRoute (dst);
+  BpEndpointId next_hop = route->GetRoute (dst);
+  InetSocketAddress address = getL4Address(next_hop);
 
   InetSocketAddress defaultAddr ("127.0.0.1", 0);
   if (address == defaultAddr)
@@ -322,6 +328,35 @@ BpTcpClaProtocol::DataRecv (Ptr<Socket> socket)
    {
      m_bp->ReceivePacket (packet);
    }
+}
+
+int
+BpTcpClaProtocol::setL4Address (BpEndpointId eid, InetSocketAddress l4Address)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri() << " " << l4Address.GetIpv4());
+  
+  std::map<BpEndpointId, InetSocketAddress>::iterator it = m_l4Addresses.find (eid);
+  if (it == m_l4Addresses.end ())
+    m_l4Addresses.insert (std::pair<BpEndpointId, InetSocketAddress>(eid, l4Address));  
+  else
+    return -1;
+  
+  return 0;
+}
+
+InetSocketAddress
+BpTcpClaProtocol::getL4Address (BpEndpointId eid)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri());
+
+  std::map<BpEndpointId, InetSocketAddress>::iterator it = m_l4Addresses.find (eid);
+  if (it == m_l4Addresses.end ())
+  {
+    InetSocketAddress badAddr ("1.0.0.1", 0);
+    return badAddr;
+  }
+  else
+    return ((*it).second); 
 }
 
 void

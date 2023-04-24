@@ -27,6 +27,7 @@
 #include "ns3/object.h"
 #include "ns3/event-id.h"
 #include "ns3/nstime.h"
+#include "ns3/inet-socket-address.h"
 #include <string>
 #include <map>
 #include <queue>
@@ -39,12 +40,14 @@ namespace ns3 {
 struct BpRegisterInfo {
   BpRegisterInfo () 
     : lifetime (0),
-      state (true)
+      state (true),
+      cla (NULL)
     {
     }
 
   double lifetime;   /// the lifetime of a bundle in seconds
   bool state;        /// the register state of registration
+  Ptr<BpClaProtocol> cla;
 };
 
 /**
@@ -80,7 +83,7 @@ public:
    */
   virtual void Open (Ptr<Node> node);
 
-  int ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state);
+  int ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state, const InetSocketAddress l4Address);
 
   /**
    * \brief Register a local endpoint id in the bundle protocol

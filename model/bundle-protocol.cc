@@ -133,12 +133,18 @@ BundleProtocol::SetBpEndpointId (BpEndpointId eid)
 }
 
 int
-BundleProtocol::ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state)
+BundleProtocol::ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state, const InetSocketAddress l4Address)
 {
   NS_LOG_FUNCTION (this << " " << eid.Uri ());
   BpRegisterInfo info;
   info.lifetime = lifetime;
   info.state = state;
+  info.cla = m_cla;
+  int retval = m_cla->setL4Address (eid, l4Address);
+  if (retval < 0)
+  {
+    return -1;
+  }
   return Register (eid, info);
 }
 
@@ -153,6 +159,7 @@ BundleProtocol::Register (const BpEndpointId &eid, const struct BpRegisterInfo &
       BpRegisterInfo rInfo;
       rInfo.lifetime = info.lifetime;
       rInfo.state = info.state;
+      rInfo.cla = info.cla;
       BpRegistration.insert (std::pair<BpEndpointId, BpRegisterInfo> (eid, rInfo));
 
       if (info.state)
@@ -389,10 +396,7 @@ BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEnd
       bpph.SetBlockLength (size);
 
       // copy data to packet
-      //packet = Create<Packet> (reinterpret_cast<uint8_t*>(p) + offset, size);
       packet = p->CreateFragment(offset, offset+size);
-      //uint8_t* offset_address = (uint8_t*)p + offset;
-      //memcpy (static_cast<Packet>offset_address, packet, size);
 
       packet->AddHeader (bpph);
       packet->AddHeader (bph);
@@ -516,21 +520,11 @@ BundleProtocol::RetreiveBundle ()
       // since BpHeader's length is a variable, we must also read data buffer size to guarantee that the node 
       // receives a complete primary bundle header and bundle payload header
 
-      // copy m_bpRxBufferPacket into a Buffer
       uint32_t size = m_bpRxBufferPacket->GetSize();
-      //uint8_t *buffer = (uint8_t*)std::malloc(size);
-
-      //m_bpRxBufferPacket->CopyData (buffer, size); 
-
-      //Buffer buf;
-      //buf.AddAtStart (size);
-      //Buffer::Iterator start = buf.Begin ();
-      //start.Write (buffer, size);
  
       // if there is not data, we cannot call PeekHeader, since we cannot guarantee a complete primary bundle header and 
       // bundle header is received
 
-      //if (buf.GetSize () == 0 ){
       if (size == 0 ){
         NS_LOG_DEBUG (this << " Received buffer was size 0. Returning");
         return;
@@ -726,7 +720,6 @@ BundleProtocol::GetBundle (const BpEndpointId &src)
 { 
   NS_LOG_FUNCTION (this << " " << src.Uri ());
   std::map<BpEndpointId, std::queue<Ptr<Packet> > >::iterator it = BpSendBundleStore.find (src); 
-  //it = BpSendBundleStore.find (src);
   if ( it == BpSendBundleStore.end ())
     {
       NS_LOG_FUNCTION (this << " Did not find bundle in SendBundleStore with uri: " << src.Uri ());

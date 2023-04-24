@@ -88,10 +88,10 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
     }
 }
 
-void Register (Ptr<BundleProtocol> node, BpEndpointId eid)
+void Register (Ptr<BundleProtocol> node, BpEndpointId eid, InetSocketAddress l4Address)
 {
     std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
-    node->ExternalRegister (eid, 0, true);
+    node->ExternalRegister (eid, 0, true, l4Address);
 }
 
 int
@@ -151,10 +151,6 @@ main (int argc, char *argv[])
 
   staticRouting_node2->AddNetworkRouteTo (Ipv4Address ("0.0.0.0"), Ipv4Mask ("0.0.0.0"), 1);  // setting node0 interface 1 as default route (interface 0 is loopback)
 
-  //Ptr<Ipv4> ipv4_node1 = link1_nodes.Get(1)->GetObject<Ipv4> ();
-  //ipv4_node1->SetForwarding (1, true); // set node 1 ip forwarding on interface 1 to true
-  //ipv4_node1->SetForwarding (2, true); // set node 1 ip forwarding on interface 2 to true
-
   NS_LOG_INFO ("Create bundle applications.");
  
   std::ostringstream l4type;
@@ -167,29 +163,23 @@ main (int argc, char *argv[])
   BpEndpointId eidSender ("dtn", "node0");
   BpEndpointId eidForwarder ("dtn", "node1");
   BpEndpointId eidRecv ("dtn", "node2");
-
-  /*
-  // set bundle static routing
-  Ptr<BpStaticRoutingProtocol> route = CreateObject<BpStaticRoutingProtocol> ();
-  route->AddRoute (eidSender, InetSocketAddress (link1_i.GetAddress (0), 9));
-  route->AddRoute (eidForwarder, InetSocketAddress (link1_i.GetAddress (1), 9));
-  route->AddRoute (eidRecv, InetSocketAddress (link2_i.GetAddress (1), 9));
-  */
  
+  // get node L4 addresses
+  InetSocketAddress senderL4addr (link1_i.GetAddress(0),9);
+  InetSocketAddress forwarderL4addr_link1 (link1_i.GetAddress(1),9);
+  InetSocketAddress forwarderL4addr_link2 (link2_i.GetAddress(0),9);
+  InetSocketAddress recvL4addr (link2_i.GetAddress(1),9);
+
   // set bundle static routing for sender
   Ptr<BpStaticRoutingProtocol> route_sender = CreateObject<BpStaticRoutingProtocol> (); // static routes for sender
-  route_sender->AddRoute (eidForwarder, InetSocketAddress (link1_i.GetAddress(1),9)); // dest: forwarder; next_hop: forwarder
-  route_sender->AddRoute (eidRecv, InetSocketAddress (link1_i.GetAddress(1),9)); // dest: recv; next_hop: forwarder
+  route_sender->AddRoute (eidRecv, eidForwarder); // dest: recv; next_hop: forwarder
 
   // set bundle static routing for forwarder
   Ptr<BpStaticRoutingProtocol> route_forwarder = CreateObject<BpStaticRoutingProtocol> (); // static routes for forwarder
-  route_forwarder->AddRoute (eidSender, InetSocketAddress (link1_i.GetAddress(0),9)); // dest: sender; next_hop: sender
-  route_forwarder->AddRoute (eidRecv, InetSocketAddress (link2_i.GetAddress(1),9)); // dest: recv; next_hop: sender
 
   // set bundle static routing for recv
   Ptr<BpStaticRoutingProtocol> route_recv = CreateObject<BpStaticRoutingProtocol> (); // static routes for recv
-  route_recv->AddRoute (eidSender, InetSocketAddress (link2_i.GetAddress(0),9)); // dest: sender; next_hop: forwarder
-  route_recv->AddRoute (eidForwarder, InetSocketAddress (link2_i.GetAddress(0),9)); // dest: recv; next_hop: forwarder
+  route_recv->AddRoute (eidSender, eidForwarder); // dest: sender; next_hop: forwarder
 
   // sender  
   BundleProtocolHelper bpSenderHelper;
@@ -219,14 +209,14 @@ main (int argc, char *argv[])
   bpReceivers.Stop (Seconds (1.0));
 
   // register external nodes with each node
-  Simulator::Schedule (Seconds (0.0), &Register, bpSenders.Get (0), eidForwarder);
-  Simulator::Schedule (Seconds (0.0), &Register, bpSenders.Get (0), eidRecv);
+  Simulator::Schedule (Seconds (0.0), &Register, bpSenders.Get (0), eidForwarder, forwarderL4addr_link1);
+  Simulator::Schedule (Seconds (0.0), &Register, bpSenders.Get (0), eidRecv, recvL4addr);
 
-  Simulator::Schedule (Seconds (0.0), &Register, bpForwarders.Get (0), eidSender);
-  Simulator::Schedule (Seconds (0.0), &Register, bpForwarders.Get (0), eidRecv);
+  Simulator::Schedule (Seconds (0.0), &Register, bpForwarders.Get (0), eidSender, senderL4addr);
+  Simulator::Schedule (Seconds (0.0), &Register, bpForwarders.Get (0), eidRecv, recvL4addr);
 
-  Simulator::Schedule (Seconds (0.0), &Register, bpReceivers.Get (0), eidForwarder);
-  Simulator::Schedule (Seconds (0.0), &Register, bpReceivers.Get (0), eidSender);
+  Simulator::Schedule (Seconds (0.0), &Register, bpReceivers.Get (0), eidForwarder, forwarderL4addr_link2);
+  Simulator::Schedule (Seconds (0.0), &Register, bpReceivers.Get (0), eidSender, senderL4addr);
 
   char data[] = "Mr. Chairman, this movement is exclusively the work of politicians; "
                 "a set of men who have interests aside from the interests of the people, and who, "
@@ -238,22 +228,8 @@ main (int argc, char *argv[])
   NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);
   Simulator::Schedule (Seconds (0.3), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);  
 
-  // forwarding function
-  Simulator::Schedule (Seconds (0.7), &Receive, bpForwarders.Get (0), eidRecv);
-
   // receive function
   Simulator::Schedule (Seconds (0.8), &Receive_char_array, bpReceivers.Get (0), eidRecv);
-  /*
-  // send 1000 bytes bundle 
-  uint32_t size = 1000;
-  Simulator::Schedule (Seconds (0.3), &Send, bpSenders.Get (0), size, eidSender, eidRecv);
-
-  // forwarding function
-  Simulator::Schedule (Seconds (0.7), &Receive, bpForwarders.Get (0), eidRecv);
-
-  // receive function
-  Simulator::Schedule (Seconds (0.8), &Receive, bpReceivers.Get (0), eidRecv);
-  */
   if (tracing)
     {
       AsciiTraceHelper ascii;

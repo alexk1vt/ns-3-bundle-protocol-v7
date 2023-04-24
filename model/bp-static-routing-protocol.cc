@@ -54,14 +54,13 @@ BpStaticRoutingProtocol::SetBundleProtocol (Ptr<BundleProtocol> bundleProtocol)
 }
 
 int 
-BpStaticRoutingProtocol::AddRoute (BpEndpointId eid, InetSocketAddress address) // -- so the address is the exit interface for the given endpoint id?
+BpStaticRoutingProtocol::AddRoute (BpEndpointId eid, BpEndpointId next_hop) // -- setting the next hop node for target node
 { 
-  NS_LOG_FUNCTION (this << " " << eid.Uri () << " " << address.GetIpv4 () << " " << address.GetPort ());
-  std::map <BpEndpointId, InetSocketAddress>::iterator it = m_routeMap.end ();
-  it = m_routeMap.find (eid);
+  NS_LOG_FUNCTION (this << " " << eid.Uri () << " " << next_hop.Uri ());
+  std::map <BpEndpointId, BpEndpointId>::iterator it = m_routeMap.find (eid);
   if (it == m_routeMap.end ())
     {
-      m_routeMap.insert (std::pair<BpEndpointId, InetSocketAddress>(eid, address));
+      m_routeMap.insert (std::pair<BpEndpointId, BpEndpointId>(eid, next_hop));
     }
   else
     {
@@ -72,16 +71,15 @@ BpStaticRoutingProtocol::AddRoute (BpEndpointId eid, InetSocketAddress address) 
   return 0;
 }
 
-InetSocketAddress 
+//InetSocketAddress 
+BpEndpointId
 BpStaticRoutingProtocol::GetRoute (BpEndpointId eid)
 { 
   NS_LOG_FUNCTION (this << " " << eid.Uri ());
-  std::map <BpEndpointId, InetSocketAddress>::iterator it = m_routeMap.end ();
-  it = m_routeMap.find (eid);
+  std::map <BpEndpointId, BpEndpointId>::iterator it = m_routeMap.find (eid);
   if (it == m_routeMap.end ())
     {
-      InetSocketAddress address("127.0.0.1", 0);
-      return address;
+      return eid;
     }
   else
     {

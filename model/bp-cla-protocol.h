@@ -31,6 +31,7 @@ class Packet;
 class BundleProtocol;
 class BpEndpointId;
 class BpRoutingProtocol;
+class InetSocketAddress;
 
 
 /**
@@ -110,6 +111,10 @@ public:
    * Get the pointer of bundle routing protocol
    */
   virtual Ptr<BpRoutingProtocol> GetRoutingProtocol () = 0; 
+
+  virtual int setL4Address (BpEndpointId eid, InetSocketAddress l4Address) = 0;
+
+  virtual InetSocketAddress getL4Address (BpEndpointId eid) = 0;
 };
 
 } // namespace ns3
