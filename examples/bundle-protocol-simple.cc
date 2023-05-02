@@ -90,6 +90,12 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
     }
 }
 
+void Register (Ptr<BundleProtocol> node, BpEndpointId eid, InetSocketAddress l4Address)
+{
+    std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
+    node->ExternalRegister (eid, 0, true, l4Address);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -132,10 +138,15 @@ main (int argc, char *argv[])
   BpEndpointId eidSender ("dtn", "node0");
   BpEndpointId eidRecv ("dtn", "node1");
 
-  // set bundle static routing
-  Ptr<BpStaticRoutingProtocol> route = CreateObject<BpStaticRoutingProtocol> ();
-  //route->AddRoute (eidSender, InetSocketAddress (i.GetAddress (0), 9));  // -- this is valid for direct connection
-  //route->AddRoute (eidRecv, InetSocketAddress (i.GetAddress (1), 9));  // -- ditto; otherwise would need to provide ipv4 address of next hop
+  // get node L4 addresses
+  InetSocketAddress Node0Addr (i.GetAddress (0), 9);
+  InetSocketAddress Node1Addr (i.GetAddress (1), 9);
+
+  // set bundle static routing for node0
+  Ptr<BpStaticRoutingProtocol> RouteNode0 = CreateObject<BpStaticRoutingProtocol> (); // No need for routing when directly connected, just have an object created
+
+  // set bundle static routing for node1
+  Ptr<BpStaticRoutingProtocol> RouteNode1 = CreateObject<BpStaticRoutingProtocol> ();  // No need for routing when directly connected, just have an object created
 
   // sender  
   // -- So each BP node is assigned a routing protocol (with static/dynamic routes)
@@ -143,7 +154,7 @@ main (int argc, char *argv[])
 
   // -- are the endpoints being registered here?  How do endpoints get discovered across a network?
   BundleProtocolHelper bpSenderHelper;
-  bpSenderHelper.SetRoutingProtocol (route);
+  bpSenderHelper.SetRoutingProtocol (RouteNode0);
   bpSenderHelper.SetBpEndpointId (eidSender);
   BundleProtocolContainer bpSenders = bpSenderHelper.Install (nodes.Get (0)); // -- so this is creating an actual instanciation
   bpSenders.Start (Seconds (0.1)); // -- Sender starts at 0.1 sec and stops at 1
@@ -151,11 +162,15 @@ main (int argc, char *argv[])
 
   // receiver
   BundleProtocolHelper bpReceiverHelper;
-  bpReceiverHelper.SetRoutingProtocol (route);
+  bpReceiverHelper.SetRoutingProtocol (RouteNode1);
   bpReceiverHelper.SetBpEndpointId (eidRecv);
   BundleProtocolContainer bpReceivers = bpReceiverHelper.Install (nodes.Get (1)); // -- again, the actual instanciation
   bpReceivers.Start (Seconds (0.0)); // -- Receiver starts at 0.0 sec and stops at 1 (assuming to ensure receiver is g2g before sender starts transmitting)
   bpReceivers.Stop (Seconds (1.0));
+
+  // register external nodes with each node
+  Simulator::Schedule (Seconds (0.0), &Register, bpSenders.Get (0), eidRecv, Node1Addr);
+  Simulator::Schedule (Seconds (0.0), &Register, bpReceivers.Get (0), eidSender, Node0Addr);
 
   // send 1000 bytes bundle 
   
@@ -170,6 +185,7 @@ main (int argc, char *argv[])
   */
   // Sending a bundle packet of data
   //char data[] = "Books serve to show a man that those original thoughts of his aren't very new after all.";
+  
   
   char data[] = "Mr. Chairman, this movement is exclusively the work of politicians; "
                 "a set of men who have interests aside from the interests of the people, and who, "
