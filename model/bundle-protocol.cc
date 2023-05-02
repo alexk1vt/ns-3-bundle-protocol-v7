@@ -315,8 +315,15 @@ BundleProtocol::Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId
 
       if (m_cla)
         {
-           m_cla->SendPacket (packet);                             
-           num++;
+           //m_cla->SendPacket (packet);
+           if (m_cla->SendPacket (packet) == 0)
+           {
+             num++;
+           }
+           else
+           {
+            NS_LOG_FUNCTION(this << " " << "CLA unable to send to send bundle");
+           }
         }
       else
         NS_FATAL_ERROR ("BundleProtocol::Send (): undefined m_cla");
@@ -325,7 +332,10 @@ BundleProtocol::Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId
 
       // force the convergence layer to send the packet
       if (num == 1)
-        m_cla->SendPacket (packet);                             
+        if (m_cla->SendPacket (packet) != 0)
+        {
+          NS_LOG_FUNCTION(this << " " << "CLA unable to send to send bundle");
+        }
     }
 
   return 0;
