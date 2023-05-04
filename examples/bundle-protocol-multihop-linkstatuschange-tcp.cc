@@ -258,11 +258,37 @@ main (int argc, char *argv[])
   // Shutting node1 interface 2 down
   Simulator::Schedule (Seconds (0.211), &Ipv4Interface::SetDown,iface2_node1);
 
-   char data[] = "Mr. Chairman, this movement is exclusively the work of politicians; "
+/*
+  char data[] = "Mr. Chairman, this movement is exclusively the work of politicians; "
                 "a set of men who have interests aside from the interests of the people, and who, "
                 "to say the most of them, are, taken as a mass, at least one long step removed from "
                 "honest men. I say this with the greater freedom because, being a politician myself, "
                 "none can regard it as personal.";
+*/
+
+char data[] = "The Senate of the United States shall be composed of two Senators from each State, "
+                "chosen by the Legislature thereof, for six Years; and each Senator shall have one Vote."
+                "Immediately after they shall be assembled in Consequence of the first Election, they shall"
+                " be divided as equally as may be into three Classes. The Seats of the Senators of the"
+                " first Class shall be vacated at the Expiration of the second Year, of the second Class at"
+                " the Expiration of the fourth Year, and of the third Class at the Expiration of the sixth"
+                " Year, so that one third may be chosen every second Year; and if Vacancies happen by "
+                "Resignation, or otherwise, during the Recess of the Legislature of any State, the Executive"
+                " thereof may make temporary Appointments until the next Meeting of the Legislature, which"
+                " shall then fill such Vacancies. No Person shall be a Senator who shall not have attained"
+                " to the Age of thirty Years, and been nine Years a Citizen of the United States, and who"
+                " shall not, when elected, be an Inhabitant of that State for which he shall be chosen."
+                "The Vice President of the United States shall be President of the Senate, but shall have "
+                "no Vote, unless they be equally divided.  The Senate shall chuse their other Officers, "
+                "and also a President pro tempore, in the Absence of the Vice President, or when he shall"
+                " exercise the Office of President of the United States. The Senate shall have the sole "
+                "Power to try all Impeachments. When sitting for that Purpose, they shall be on Oath or"
+                " Affirmation. When the President of the United States is tried, the Chief Justice shall"
+                " preside: And no Person shall be convicted without the Concurrence of two thirds of the "
+                "Members present. Judgment in Cases of Impeachment shall not extend further than to removal"
+                " from Office, and disqualification to hold and enjoy any Office of honor, Trust or Profit"
+                " under the United States: but the Party convicted shall nevertheless be liable and subject"
+                " to Indictment, Trial, Judgment and Punishment, according to Law.";
 
   // sending data bundle
   NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);
@@ -280,8 +306,8 @@ main (int argc, char *argv[])
   if (tracing)
     {
       AsciiTraceHelper ascii;
-      pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("bundle-protocol-multihop-tcp.tr"));
-      pointToPoint.EnablePcapAll ("bundle-protocol-multihop-tcp", false);
+      pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("bundle-protocol-multihop-lsc-tcp.tr"));
+      pointToPoint.EnablePcapAll ("bundle-protocol-multihop-lsc-tcp", false);
     }
 
   NS_LOG_INFO ("Run Simulation.");

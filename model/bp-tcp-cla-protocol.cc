@@ -71,8 +71,8 @@ BpTcpClaProtocol::BpTcpClaProtocol ()
 { 
   NS_LOG_FUNCTION (this);
   //Added by AlexK.  - Config not within NS3 namespace as documentation stated it would be
-  int tcpSegmentSize = 1000; //to account for bundle fragment sizes exceeding ns-3 default tcp packet size (512)
-  Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (tcpSegmentSize));
+  //int tcpSegmentSize = 1000; //to account for bundle fragment sizes exceeding ns-3 default tcp packet size (512)
+  //Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (tcpSegmentSize));
 }
 
 BpTcpClaProtocol::~BpTcpClaProtocol ()
@@ -135,11 +135,59 @@ BpTcpClaProtocol::RemoveL4Socket (Ptr<Socket> socket)
     m_l4SocketStatus.erase(socket);
     status = true;
   }
+  if (!status)
+  {
+    return false;
+  }
+  status = false;
+  std::map<Ptr<Socket>, InetSocketAddress>::iterator iterate = m_SendSocketL4Addresses.find (socket);
+  if (iterate != m_SendSocketL4Addresses.end ())
+  {
+    m_SendSocketL4Addresses.erase(socket);
+    status = true;
+  }
   return status;
 }
 
+InetSocketAddress
+BpTcpClaProtocol::GetSendSocketAddress(Ptr<Socket> socket)
+{
+  NS_LOG_FUNCTION (this << " " << socket);
+
+  std::map<Ptr<Socket>, InetSocketAddress>::iterator it = m_SendSocketL4Addresses.find (socket);
+  if (it == m_SendSocketL4Addresses.end ())
+  {
+    //entry doesn't exist, so return bad addy
+    return InetSocketAddress ("127.0.0.1", 0);
+    NS_LOG_FUNCTION (this << " No L4 address recorded for this socket");
+  }
+  else
+  {
+    return (*it).second;
+  }
+}
+
 void
-BpTcpClaProtocol::ResendPacket (Ptr<Packet> packet)
+BpTcpClaProtocol::SetSendSocketAddress(Ptr<Socket> socket, InetSocketAddress address)
+{
+  NS_LOG_FUNCTION (this << " " << socket << " " << address);
+
+  std::map<Ptr<Socket>, InetSocketAddress>::iterator it = m_SendSocketL4Addresses.find (socket);
+  if (it == m_SendSocketL4Addresses.end ())
+  {
+    //entry doesn't exist, so make one
+    m_SendSocketL4Addresses.insert(std::pair<Ptr<Socket>, InetSocketAddress>(socket, address));
+  }
+  else
+  {
+    // update entry
+    (*it).second = address;
+  }
+  return;
+}
+
+void
+BpTcpClaProtocol::RetrySocketConn (Ptr<Packet> packet)
 {
   NS_LOG_FUNCTION (this << " " << packet);
   // redo the SendPacket without interacting with BpSendStore
@@ -150,32 +198,7 @@ BpTcpClaProtocol::ResendPacket (Ptr<Packet> packet)
     NS_LOG_FUNCTION (this << " Unable to create new socket for packet: " << packet);
     return;
   }
-  if (GetL4SocketStatus (socket) == 0)
-  {
-    // tcp session g2g, send immediately
-    socket->Send (packet);
-    return;
-  }
-
-  Address GenericAddress;
-  socket->GetSockName(GenericAddress);
-  InetSocketAddress address = InetSocketAddress::ConvertFrom(GenericAddress);
-  
-  std::map<InetSocketAddress, std::queue<Ptr<Packet> > >::iterator it = SocketAddressSendQueue.find(address);
-  if ( it == SocketAddressSendQueue.end ())
-  {
-    // this is the first packet being sent to this address
-    std::queue<Ptr<Packet> > qu;
-    qu.push (packet);
-    SocketAddressSendQueue.insert (std::pair<InetSocketAddress, std::queue<Ptr<Packet> > > (address, qu) );
-  }
-  else
-  {
-    // ongoing packet
-    (*it).second.push (packet);
-  }
 }
-
 
 int
 BpTcpClaProtocol::SendPacket (Ptr<Packet> packet)
@@ -209,13 +232,11 @@ BpTcpClaProtocol::SendPacket (Ptr<Packet> packet)
       }
       else // tcp session not yet ready, store for later sending
       {
-        Address GenericAddress;
-        socket->GetSockName(GenericAddress);
-        InetSocketAddress address = InetSocketAddress::ConvertFrom(GenericAddress);
-
-        //Ipv4Address ipv4Address = Ipv4Address::ConvertFrom(address);
-        NS_LOG_FUNCTION (this << " Placing packet sent from eid: " << src.Uri () << " to eid: " << dst.Uri () << " into queue for later sending with address: " << address);
-        NS_LOG_FUNCTION (this << " BpNode " << m_bp << " eid " << m_bp->GetBpEndpointId ().Uri ());
+        InetSocketAddress address = GetSendSocketAddress (socket);
+        // !! TEST FOR BAD ADDRESS
+        
+        NS_LOG_FUNCTION (this << " BpNode " << m_bp << " with eid " << m_bp->GetBpEndpointId ().Uri () << " Placing packet sent from eid: " << src.Uri () << " to eid: " << dst.Uri () << " into queue for later sending with address: " << address);
+        NS_LOG_FUNCTION (this << " checking map at location: " << &SocketAddressSendQueue << "with size of: " << SocketAddressSendQueue.size());
 
         std::map<InetSocketAddress, std::queue<Ptr<Packet> > >::iterator it = SocketAddressSendQueue.find(address);
         if ( it == SocketAddressSendQueue.end ())
@@ -224,11 +245,13 @@ BpTcpClaProtocol::SendPacket (Ptr<Packet> packet)
           std::queue<Ptr<Packet> > qu;
           qu.push (pkt);
           SocketAddressSendQueue.insert (std::pair<InetSocketAddress, std::queue<Ptr<Packet> > > (address, qu) );
+          NS_LOG_FUNCTION (this << " built new queue for target address.  Queue address: " << &qu);
         }
       else
         {
           // ongoing packet
           (*it).second.push (pkt);
+          NS_LOG_FUNCTION (this << " queue now has " << ((*it).second).size () << " items at address: " << &((*it).second));
         }
       }
     }
@@ -331,6 +354,7 @@ BpTcpClaProtocol::EnableSend (const BpEndpointId &src, const BpEndpointId &dst)
     NS_LOG_FUNCTION (this << " " << "Unable to create socket, cannot connect to address ");
     return -1;
   }
+  NS_LOG_FUNCTION (this << " Requesting connection to address: " << address);
   if (socket->ShutdownRecv () < 0)
   {
     NS_LOG_FUNCTION (this << " " << "Unable to create socket, received shutdown");
@@ -339,7 +363,7 @@ BpTcpClaProtocol::EnableSend (const BpEndpointId &src, const BpEndpointId &dst)
 
   SetL4SocketCallbacks (socket);
 
-  // store the sending socket so that the convergence layer can dispatch the hundles to different tcp connections
+  // store the sending socket so that the convergence layer can dispatch the bundles to different tcp connections
   std::map<BpEndpointId, Ptr<Socket> >::iterator it = m_l4SendSockets.find (src);
   if (it == m_l4SendSockets.end ())
     m_l4SendSockets.insert (std::pair<BpEndpointId, Ptr<Socket> >(src, socket));  
@@ -348,6 +372,9 @@ BpTcpClaProtocol::EnableSend (const BpEndpointId &src, const BpEndpointId &dst)
 
   // store initial state of sending socket
   SetL4SocketStatus(socket, 1);
+
+  // store the remote address this socket is connecting to
+  SetSendSocketAddress(socket, address);
 
   return 0;
 }
@@ -385,17 +412,13 @@ BpTcpClaProtocol::ConnectionSucceeded (Ptr<Socket> socket)
 
   SetL4SocketStatus(socket, 0);
 
-  Address GenericAddress;
-  if (socket->GetSockName(GenericAddress) != 0)
-  {
-    NS_LOG_FUNCTION (this << " unable to get socket address");
-    return;
-  }
-  InetSocketAddress SockAddress = InetSocketAddress::ConvertFrom(GenericAddress);
-  if (!SocketAddressSendQueueEmpty (SockAddress))
+  InetSocketAddress address = GetSendSocketAddress(socket);
+  // !! TEST IF GIVEN BAD ADDRESS
+
+  if (!SocketAddressSendQueueEmpty (address))
   {
     // still have packets to send to this address
-    NS_LOG_FUNCTION (this << " sending packet to address" << SockAddress);
+    NS_LOG_FUNCTION (this << " sending packet to address" << address);
     m_send(socket); // send any waiting packets
   }
 } 
@@ -406,13 +429,9 @@ BpTcpClaProtocol::ConnectionFailed (Ptr<Socket> socket)
   NS_LOG_FUNCTION (this << " " << socket);
   SetL4SocketStatus(socket, 2);
 
-  Address genericAddress;
-  if (socket->GetSockName(genericAddress) != 0)
-  {
-    NS_LOG_FUNCTION (this << " Unable to get socket address");
-    return;
-  }
-  InetSocketAddress address = InetSocketAddress::ConvertFrom(genericAddress);
+  InetSocketAddress address = GetSendSocketAddress(socket);
+  // !! TEST IF GIVEN BAD ADDRESS
+  
   NS_LOG_FUNCTION(this << " was intended for address: " << address);
   std::map<InetSocketAddress, std::queue<Ptr<Packet> > >::iterator it = SocketAddressSendQueue.find (address); 
   if ( it == SocketAddressSendQueue.end ())
@@ -435,8 +454,10 @@ BpTcpClaProtocol::ConnectionFailed (Ptr<Socket> socket)
   }
 
   //socket->Close(); // Socket already being closed by ns-3; errors-out if attempt to manually close
+  
   // socket records removed, now try to resend
-  ResendPacket(packet);
+  //ResendPacket(packet);
+  RetrySocketConn (packet);
 }
 
 void 
@@ -452,17 +473,16 @@ BpTcpClaProtocol::ErrorClose (Ptr<Socket> socket)
   NS_LOG_FUNCTION (this << " " << socket);
   SetL4SocketStatus(socket, 4);
 
-  Address GenericAddress;
-  if (socket->GetSockName(GenericAddress) != 0)
-  {
-    NS_LOG_FUNCTION (this << " Unable to get socket address");
-    return;
-  }
-  InetSocketAddress address = InetSocketAddress::ConvertFrom(GenericAddress);
+  InetSocketAddress address = GetSendSocketAddress (socket);
+  // !! TEST FOR BAD ADDRESS
   if (!SocketAddressSendQueueEmpty (address))
   {
     // still have packets to send to this address
     NS_LOG_FUNCTION (this << " still have remaining packets to send to address" << address);
+  }
+  if (!RemoveL4Socket (socket))
+  {
+    NS_LOG_FUNCTION (this << " unable to remove socket from records");
   }
 }
 
@@ -535,25 +555,6 @@ BpTcpClaProtocol::getL4Address (BpEndpointId eid)
     return ((*it).second); 
 }
 
-/*
-BpEndpointId
-BpTcpClaProtocol::GetEidFromL4Address(InetSocketAddress Address)
-{
-  NS_LOG_FUNCTION (this << " " << Address);
-
-  for (auto& it : m_l4Addresses) 
-  {
-    if (it.second == Address)
-    {
-      return it.first;
-    }
-  }
-  // address not found
-  BpEndpointId BadEid ("0", "0");
-  return BadEid;
-}
-*/
-
 void 
 BpTcpClaProtocol::SetL4SocketStatus (Ptr<Socket> socket, u_int16_t status)
 {
@@ -606,13 +607,9 @@ BpTcpClaProtocol::m_send (Ptr<Socket> socket)
 {
   NS_LOG_FUNCTION (this << " " << socket);
 
-  Address genericAddress;
-  if (socket->GetSockName(genericAddress) != 0)
-  {
-    NS_LOG_FUNCTION (this << " Unable to get socket address");
-    return;
-  }
-  InetSocketAddress address = InetSocketAddress::ConvertFrom(genericAddress);
+  InetSocketAddress address = GetSendSocketAddress (socket);
+  // !! TEST FOR BAD ADDRESS
+
   while (true)
   {
     std::map<InetSocketAddress, std::queue<Ptr<Packet> > >::iterator it = SocketAddressSendQueue.find (address); 
@@ -643,7 +640,7 @@ BpTcpClaProtocol::m_send (Ptr<Socket> socket)
 bool
 BpTcpClaProtocol::SocketAddressSendQueueEmpty (InetSocketAddress address)
 {
-  NS_LOG_FUNCTION (this << " " << address << " ");
+  NS_LOG_FUNCTION (this << " " << address << " checking map at location: " << &SocketAddressSendQueue << "with size of: " << SocketAddressSendQueue.size());
 
   std::map<InetSocketAddress, std::queue<Ptr<Packet> > >::iterator it = SocketAddressSendQueue.find (address); 
   if ( it == SocketAddressSendQueue.end ())
@@ -658,7 +655,7 @@ BpTcpClaProtocol::SocketAddressSendQueueEmpty (InetSocketAddress address)
       NS_LOG_FUNCTION (this << " Found queue in SocketAddressSendQueue for address: " << address << " but is empty");
       return true;
     }
-    NS_LOG_FUNCTION (this << " Found queue in SocketAddressSendQueue for address: " << address << " with this number of packets: " << ((*it).second).size ());
+    NS_LOG_FUNCTION (this << " Found queue in SocketAddressSendQueue for address: " << address << " with this number of packets: " << ((*it).second).size () << " at address: " << &((*it).second));
     return false;
   }
 }

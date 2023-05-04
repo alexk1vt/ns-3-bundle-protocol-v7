@@ -193,12 +193,15 @@ private:
 
   virtual void SetL4SocketStatus (Ptr<Socket> socket, u_int16_t status);
   virtual u_int16_t GetL4SocketStatus (Ptr<Socket> socket);
-  //virtual BpEndpointId GetEidFromL4Address(InetSocketAddress Address);
+  virtual InetSocketAddress GetSendSocketAddress(Ptr<Socket> socket);
+  virtual void SetSendSocketAddress(Ptr<Socket> socket, InetSocketAddress address);
 
   virtual void m_send (Ptr<Socket> socket);
   virtual bool SocketAddressSendQueueEmpty (InetSocketAddress address);
 
-  virtual void ResendPacket (Ptr<Packet> packet);
+  //virtual void ResendPacket (Ptr<Packet> packet);
+
+  virtual void RetrySocketConn (Ptr<Packet> packet);
 
 private:
   Ptr<BundleProtocol> m_bp;                             /// bundle protocol
@@ -212,7 +215,7 @@ private:
                                                     // 3 - Connection closed normally
                                                     // 4 - Connection closed by error
                                                     // 5 - No status
-
+  std::map<Ptr<Socket>, InetSocketAddress> m_SendSocketL4Addresses; // map of destination addresses to corresponding sockets (since you cant query sockets for the remote address they are connected to)
   std::map<InetSocketAddress, std::queue<Ptr<Packet> > > SocketAddressSendQueue; // storage of packets going to a particular L4 address while waiting for TCP sessions to be built
   Ptr<BpRoutingProtocol> m_bpRouting;                   /// bundle routing protocol
 };

@@ -186,14 +186,14 @@ main (int argc, char *argv[])
   // Sending a bundle packet of data
   //char data[] = "Books serve to show a man that those original thoughts of his aren't very new after all.";
   
-  
+  /*
   char data[] = "Mr. Chairman, this movement is exclusively the work of politicians; "
                 "a set of men who have interests aside from the interests of the people, and who, "
                 "to say the most of them, are, taken as a mass, at least one long step removed from "
                 "honest men. I say this with the greater freedom because, being a politician myself, "
                 "none can regard it as personal.";
+  */
   
-  /*
   char data[] = "The Senate of the United States shall be composed of two Senators from each State, "
                 "chosen by the Legislature thereof, for six Years; and each Senator shall have one Vote."
                 "Immediately after they shall be assembled in Consequence of the first Election, they shall"
@@ -217,7 +217,7 @@ main (int argc, char *argv[])
                 " from Office, and disqualification to hold and enjoy any Office of honor, Trust or Profit"
                 " under the United States: but the Party convicted shall nevertheless be liable and subject"
                 " to Indictment, Trial, Judgment and Punishment, according to Law.";
-*/
+
 
   NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);
   Simulator::Schedule (Seconds (0.2), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);  

@@ -333,6 +333,8 @@ private:
   std::map<BpEndpointId, std::queue<Ptr<Packet> > > BpRecvBundleStore; /// persistant storage of received bundles: map (destination endpoint id, bundle packet queue )
   std::map<BpEndpointId, BpRegisterInfo> BpRegistration; /// persistant storage of registrations: map (local endpoint id, registration information)
 
+  std::map<std::string, std::map<u_int32_t, Ptr<Packet> > > BpRecvFragMap; /// mapping of partial bundle fragment buffers
+
   Ptr<Packet> m_bpRxBufferPacket; /// a buffer for all packets received from the CLA; bundles are retreived from this buffer
 
   SequenceNumber32 m_seq;         /// the bundle sequence number
