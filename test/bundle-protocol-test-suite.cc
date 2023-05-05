@@ -48,6 +48,7 @@ private:
   virtual void DoRun (void);
   void Send (Ptr<BundleProtocol> sender, uint32_t size, BpEndpointId src, BpEndpointId dst);
   void Receive (Ptr<BundleProtocol> receiver, BpEndpointId eid);
+  void Register (Ptr<BundleProtocol> node, BpEndpointId eid, InetSocketAddress l4Address);
 
 private:
   uint32_t m_sentBundleSize;   
@@ -121,10 +122,14 @@ BundleProtocolTestCase::DoRun (void)
   BpEndpointId eidSender ("dtn", "node0");
   BpEndpointId eidRecv ("dtn", "node1");
 
+  // get node L4 addresses
+  InetSocketAddress Node0Addr (i.GetAddress (0), 9);
+  InetSocketAddress Node1Addr (i.GetAddress (1), 9);
+
   // set bundle static routing
   Ptr<BpStaticRoutingProtocol> route = CreateObject<BpStaticRoutingProtocol> ();
-  route->AddRoute (eidSender, InetSocketAddress (i.GetAddress (0), 9));
-  route->AddRoute (eidRecv, InetSocketAddress (i.GetAddress (1), 9));
+  //route->AddRoute (eidSender, InetSocketAddress (i.GetAddress (0), 9));
+  //route->AddRoute (eidRecv, InetSocketAddress (i.GetAddress (1), 9));
 
   // sender  
   BundleProtocolHelper bpSenderHelper;
@@ -141,6 +146,10 @@ BundleProtocolTestCase::DoRun (void)
   BundleProtocolContainer bpReceivers = bpReceiverHelper.Install (nodes.Get (1));
   bpReceivers.Start (Seconds (0.0));
   bpReceivers.Stop (Seconds (1.0));
+
+  // register external nodes with each node
+  Simulator::Schedule (Seconds (0.1), &BundleProtocolTestCase::Register, this, bpSenders.Get (0), eidRecv, Node1Addr);
+  Simulator::Schedule (Seconds (0.1), &BundleProtocolTestCase::Register, this, bpReceivers.Get (0), eidSender, Node0Addr);
 
   Simulator::Schedule (Seconds (0.2), &BundleProtocolTestCase::Send, this, bpSenders.Get (0), 
                        m_sentBundleSize, eidSender, eidRecv);
@@ -179,3 +188,9 @@ BundleProtocolTestCase::Receive (Ptr<BundleProtocol> receiver, BpEndpointId eid)
     }
 }
 
+void
+BundleProtocolTestCase::Register (Ptr<BundleProtocol> node, BpEndpointId eid, InetSocketAddress l4Address)
+{
+    std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
+    node->ExternalRegister (eid, 0, true, l4Address);
+}
