@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <string>
 
+#include "json.hpp"
 #include "sdnv.h"
 #include <vector>
 #include <ctime>
