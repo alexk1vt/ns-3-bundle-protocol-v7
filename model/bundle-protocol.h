@@ -16,6 +16,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: Dizhi Zhou <dizhi.zhou@gmail.com>
+ * 
+ * * BP-7 Author: Alexander Kedrowitsch <alexk1@vt.edu>
+ * 
  */
 #ifndef BUNDLE_PROTOCOL_H
 #define BUNDLE_PROTOCOL_H

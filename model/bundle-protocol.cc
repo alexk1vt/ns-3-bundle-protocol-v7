@@ -16,6 +16,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: Dizhi Zhou <dizhi.zhou@gmail.com>
+ * 
+ * * BP-7 Author: Alexander Kedrowitsch <alexk1@vt.edu>
+ * 
  */
 
 #include "ns3/log.h"
@@ -28,8 +31,10 @@
 #include "ns3/buffer.h"
 #include "bp-tcp-cla-protocol.h"
 #include "bundle-protocol.h"
-#include "bp-header.h"
-#include "bp-payload-header.h"
+//#include "bp-header.h"
+//#include "bp-payload-header.h"
+#include "bp-primary-block.h"
+#include "bp-canonical-block.h"
 #include <algorithm>
 #include <map>
 #include <ctime>
@@ -98,7 +103,7 @@ BundleProtocol::Open (Ptr<Node> node)
     }
   else
     {
-      NS_FATAL_ERROR ("BundleProtocol::Open (): unkonw tranport layer protocol type! " << m_l4Type);   
+      NS_FATAL_ERROR ("BundleProtocol::Open (): unknown tranport layer protocol type! " << m_l4Type);   
     }
 
 }
@@ -341,6 +346,8 @@ BundleProtocol::Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId
   return 0;
 }
 
+// Current implementation to send data
+// Packet p constains the ADU to send
 int 
 BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst)
 { 
@@ -367,23 +374,30 @@ BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEnd
   // a simple fragementation: ensure a bundle is transmittd by one packet at the transport layer
   SequenceNumber32 seqNum (0);
 
-  std::time_t timestamp = std::time(NULL);
+  //std::time_t timestamp = std::time(NULL);
 
   while ( total > 0 )   
     { 
+      // initialize the packet that will form our bundle payload
       Ptr<Packet> packet = NULL;
 
-      // build bundle payload header
-      BpPayloadHeader bpph;
+      // build bundle primary block
+      BpPrimaryBlock bpPrimaryblock;
 
-      // build primary bundle header
-      BpHeader bph;
-      bph.SetDestinationEid (dst);
-      bph.SetSourceEid (src);
+      //// build bundle payload header
+      //BpPayloadHeader bpph;
+      
 
-      bph.SetCreateTimestamp (timestamp);
-      bph.SetSequenceNumber (seqNum);
-      //m_seq++;
+      //// build primary bundle header
+      //BpHeader bph;
+      //bph.SetDestinationEid (dst);
+      //bph.SetSourceEid (src);
+
+      //bph.SetCreateTimestamp (timestamp);
+      //bph.SetSequenceNumber (seqNum);
+    
+      bpPrimaryblock.SetDestinationEid (dst);
+      bpPrimaryblock.SetSourceEid (src);
 
       uint32_t size = std::min (total, m_bundleSize);
 
@@ -392,30 +406,50 @@ BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEnd
 
       if (fragment)
         {
-          bph.SetIsFragment (true);
-          //bph.SetFragOffset (p->GetSize () - size); // wrong!  'size' never changes, so fragments after 1st are incorrect!
-          bph.SetFragOffset (offset);
-          bph.SetAduLength (p->GetSize ()); // ADU length specifies the original ADU size
+          //bph.SetIsFragment (true);
+          //bph.SetFragOffset (offset);
+          //bph.SetAduLength (p->GetSize ()); // ADU length specifies the original ADU size
+          bpPrimaryblock.SetIsFragment (true);
+          bpPrimaryblock.SetFragmentOffset (offset);
+          bpPrimaryblock.SetAduLength (p->GetSize ()); // ADU length specifies the original ADU size
           NS_LOG_FUNCTION ("Current fragment offset: " << offset << ". Current fragment size: " << size);
         }
       else
         {
-          bph.SetIsFragment (false);
-          bph.SetAduLength (p->GetSize ());
+          //bph.SetIsFragment (false);
+          //bph.SetAduLength (p->GetSize ());
+          bpPrimaryblock.SetIsFragment (false);
+          bpPrimaryblock.SetAduLength (p->GetSize ());
         }
 
-      bph.SetBlockLength (size);       
-      bpph.SetBlockLength (size);
+      //bph.SetBlockLength (size);       
+      //bpph.SetBlockLength (size);
 
-      // copy data to packet
-      packet = p->CreateFragment(offset, size);
+      // Build the bundle payload block
+      // copy application data to packet (either as a whole or as a fragment)
+      //packet = p->CreateFragment(offset, size);
+      std::string bundlePayload = std::string(p->CreateFragment(offset, size))
+      BpCanonicalBlock bpPayloadblock;
+      bpPayloadblock.SetBlockTypeCode (1);
+      bpPayloadblock.SetBlockNumber (1);
+      bpPayloadblock.SetBlockData (bundlePayload);
 
-      packet->AddHeader (bpph);
-      packet->AddHeader (bph);
 
-      NS_LOG_FUNCTION ("Send bundle:" << " seq " << bph.GetSequenceNumber ().GetValue () << 
-                                 " src eid " << bph.GetSourceEid ().Uri () << 
-                                 " dst eid " << bph.GetDestinationEid ().Uri () << 
+      // Assemble the full bundle
+      bpPrimaryblock.RebuildPrimaryBundleBlock();
+      bpPayloadblock.RebuildCanonicalBundleBlock();
+      BpBundle bundle;
+      bundle.SetPrimaryBlock(bpPrimaryblock);
+      bundle.SetPayloadBlock(bpPayloadblock);
+      bundle.RebuildBundle();
+
+      // Serialize bundle into CBOR encoding and load into NS-3 packet
+      Ptr<Packet> packet(bundle.GetCborEncoding());
+      //packet->AddHeader (bpph);
+      //packet->AddHeader (bph);
+
+      NS_LOG_FUNCTION ("Send bundle:" << " src eid " << bpPrimaryblock.GetSourceEid ().Uri () << 
+                                 " dst eid " << bpPrimaryblock.GetDestinationEid ().Uri () << 
                                  " pkt size " << packet->GetSize ());
 
 
@@ -514,8 +548,8 @@ void
 BundleProtocol::RetreiveBundle ()
 { 
   NS_LOG_FUNCTION (this);
-  BpHeader bpHeader;         // primary bundle header
-  BpPayloadHeader bppHeader; // bundle payload header
+  //BpHeader bpHeader;         // primary bundle header
+  //BpPayloadHeader bppHeader; // bundle payload header
 
   // continue to retreive a bundle from buffer until the buffer size is smaller than a bundle or a bundle header 
   // ACS start
@@ -529,18 +563,22 @@ BundleProtocol::RetreiveBundle ()
   if (m_bpRxBufferPacket->GetSize () > rand_val)
   // Alexk end
     {
-      // since BpHeader's length is a variable, we must also read data buffer size to guarantee that the node 
-      // receives a complete primary bundle header and bundle payload header
+      uint32_t size = m_bpRxBufferPacket->GetSize ();
+      std::vector <uint8_t> buffer (size);
+      m_bpRxBufferPacket->CopyData (&buffer[0], size);
+      // LEFT OFF HERE!!
+      // convert bundle from CBOR to JSON and continue to process
+      BpBundle bundle;
+      bundle.SetBundleFromCbor (buffer);
+      BpPrimaryBlock BpPrimaryBlock = bundle.GetPrimaryBlock ();
 
-      uint32_t size = m_bpRxBufferPacket->GetSize();
- 
-      // if there is not data, we cannot call PeekHeader, since we cannot guarantee a complete primary bundle header and 
-      // bundle header is received
+      // how to know if the entire bundle is in the buffer?
+      // examples would be packet level fragmentation or if the buffer is holding more than one bundle
+      m_bpRxBufferPacket->RemoveAtStart (size);
+      NS_LOG_FUNCTION (this << " Retrieved packet.  Will process and check for more.");
+      ProcessBundle (bundle);
+      Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this);
 
-      if (size == 0 ){
-        NS_LOG_DEBUG (this << " Received buffer was size 0. Returning");
-        return;
-      }
 
       m_bpRxBufferPacket->PeekHeader (bpHeader);
       m_bpRxBufferPacket->PeekHeader (bppHeader);
@@ -548,8 +586,13 @@ BundleProtocol::RetreiveBundle ()
       uint32_t total =  bpHeader.GetBlockLength ()
                       + bpHeader.GetSerializedSize () 
                       + bppHeader.GetSerializedSize ();
-
-      if (m_bpRxBufferPacket->GetSize () >= total)
+    }
+  else
+    {
+      NS_LOG_DEBUG (this << " Retrieved packet size is: " << std::to_string(m_bpRxBufferPacket->GetSize ()) << "; less than " << std::to_string(rand_val) << " Dropping.");
+    }
+}
+      /*if (m_bpRxBufferPacket->GetSize () >= total)
         {
           Ptr<Packet> bundle = m_bpRxBufferPacket->CreateFragment (0, total) ;
           m_bpRxBufferPacket->RemoveAtStart (total);
@@ -570,7 +613,7 @@ BundleProtocol::RetreiveBundle ()
       NS_LOG_DEBUG (this << " Retrieved packet size is: " << std::to_string(m_bpRxBufferPacket->GetSize ()) << "; less than " << std::to_string(rand_val) << " Dropping.");
     }
 
-}
+}*/
 
 void 
 BundleProtocol::ReceivePacket (Ptr<Packet> packet)
@@ -590,24 +633,29 @@ BundleProtocol::ReceivePacket (Ptr<Packet> packet)
 }
 
 void 
-BundleProtocol::ProcessBundle (Ptr<Packet> bundle)
+BundleProtocol::ProcessBundle (BpBundle bundle)
 { 
   NS_LOG_FUNCTION (this << " " << bundle);
-  BpHeader bpHeader;         // primary bundle header
-  BpPayloadHeader bppHeader; // bundle payload header
+  //BpHeader bpHeader;         // primary bundle header
+  //BpPayloadHeader bppHeader; // bundle payload header
+  BpPrimaryBlock bpPrimaryBlock = bundle->GetPrimaryBlock ();
 
-
-  bundle->PeekHeader (bpHeader);
-  bundle->PeekHeader (bppHeader);
+  //bundle->PeekHeader (bpHeader);
+  //bundle->PeekHeader (bppHeader);
 
   
-  BpEndpointId dst = bpHeader.GetDestinationEid ();
-  BpEndpointId src = bpHeader.GetSourceEid ();
-  
-  NS_LOG_DEBUG ("Recv bundle:" << " seq " << bpHeader.GetSequenceNumber ().GetValue () << 
-                              " src eid " << bpHeader.GetSourceEid ().Uri () << 
-                              " dst eid " << bpHeader.GetDestinationEid ().Uri () << 
-                              " packet size " << bundle->GetSize ());
+  //BpEndpointId dst = bpHeader.GetDestinationEid ();
+  //BpEndpointId src = bpHeader.GetSourceEid ();
+  BpEndpointId dst = bpPrimaryBlock.GetDestinationEid ();
+  BpEndpointId src = bpPrimaryBlock.GetSourceEid ();
+
+
+  //NS_LOG_DEBUG ("Recv bundle:" << " seq " << bpHeader.GetSequenceNumber ().GetValue () << 
+  //                            " src eid " << bpHeader.GetSourceEid ().Uri () << 
+  //                            " dst eid " << bpHeader.GetDestinationEid ().Uri () << 
+  //                            " packet size " << bundle->GetSize ());
+  NS_LOG_DEBUG ("Recv bundle: "<< " src eid " << bpPrimaryBlock.GetSourceEid ().Uri () << 
+                                 " dst eid " << bpPrimaryBlock.GetDestinationEid ().Uri ())
 
   // the destination endpoint eid is registered? 
   std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.find (dst);
@@ -632,39 +680,53 @@ BundleProtocol::ProcessBundle (Ptr<Packet> bundle)
     return;
   }
   // check if this is part of a fragment
-  if (bpHeader.IsFragment ()){
+  //if (bpHeader.IsFragment ()){
+    if (bpPrimaryBlock.IsFragment ()){
     // store all needed data from headers before we strip from them from fragments
-    time_t CreateTimeStamp = bpHeader.GetCreateTimestamp ();
-    std::string FragName = src.Uri () + "_" + std::to_string(CreateTimeStamp);
-    u_int32_t AduLength = bpHeader.GetAduLength ();
+    //time_t CreateTimeStamp = bpHeader.GetCreateTimestamp ();
+    time_t CreateTimeStamp = bpPrimaryBlock.GetCreateTimestamp ();
+    //u_int32_t AduLength = bpHeader.GetAduLength ();
+    u_int32_t AduLength = bpPrimaryBlock.GetAduLength ();
+    u_int32_t FragOffset = bpPrimaryBlock.GetFragmentOffset ();
     
     NS_LOG_FUNCTION (this << "Bundle is part of fragment: timestamp=" << CreateTimeStamp <<
                               "total ADU length: " << AduLength <<
-                              "seq=" << bpHeader.GetSequenceNumber ().GetValue () <<
-                              " offset=" << bpHeader.GetFragOffset ()); 
+                              " offset=" << FragOffset);
+                              //"seq=" << bpHeader.GetSequenceNumber ().GetValue () <<
+                              //" offset=" << bpHeader.GetFragOffset ()); 
     
+    // Build a unique identifier for this fragment
+    std::string FragName = src.Uri () + "_" + std::to_string(CreateTimeStamp);
     // is this the first fragment of the bundle we've received?
-    std::map<std::string, std::map<u_int32_t, Ptr<Packet> > >::iterator itBpFrag = BpRecvFragMap.find (FragName);
+    //std::map<std::string, std::map<u_int32_t, Ptr<Packet> > >::iterator itBpFrag = BpRecvFragMap.find (FragName);
+    std::map<std::string, std::map<u_int32_t, BpBundle > >::iterator itBpFrag = BpRecvFragMap.find (FragName);
     if (itBpFrag == BpRecvFragMap.end ())
     {
       // this is the first fragment of this bundle received
       NS_LOG_FUNCTION (this << " First fragment for bundle: " << FragName);
-      std::map<u_int32_t, Ptr<Packet> > FragMap;
-      FragMap.insert (std::pair<u_int32_t, Ptr<Packet> > (bpHeader.GetSequenceNumber ().GetValue (), bundle));
-      BpRecvFragMap.insert (std::pair<std::string, std::map<u_int32_t, Ptr<Packet> > > (FragName, FragMap));
+      // LEFT OFF HERE!!
+      // Change Fragmap to contain total ADU size as well as the offset and block data size of each fragment
+      // Once all the fragment sizes add up to total ADU size, we can reconstruct based on fragment offset
+      //std::map<u_int32_t, Ptr<Packet> > FragMap;
+      std::map<u_int32_t, BpBundle > FragMap;
+      //FragMap.insert (std::pair<u_int32_t, Ptr<Packet> > (bpHeader.GetSequenceNumber ().GetValue (), bundle));
+      FragMap.insert (std::pair<u_int32_t, BpBundle > (FragOffset, bundle));
+      BpRecvFragMap.insert (std::pair<std::string, std::map<u_int32_t, BpBundle > > (FragName, FragMap));
     }
     else
     {
       // some bundle fragments already received
-      u_int32_t fragSeqNum = bpHeader.GetSequenceNumber ().GetValue ();
-      NS_LOG_FUNCTION (this << " Already have some fragments, adding sequence number: " << fragSeqNum);
-      std::map<u_int32_t, Ptr<Packet> >::iterator itFrag = (*itBpFrag).second.find(fragSeqNum);
+      //u_int32_t fragSeqNum = bpHeader.GetSequenceNumber ().GetValue ();
+      //NS_LOG_FUNCTION (this << " Already have some fragments, adding sequence number: " << fragSeqNum);
+      //std::map<u_int32_t, Ptr<Packet> >::iterator itFrag = (*itBpFrag).second.find(fragSeqNum);
+      NS_LOG_FUNCTION (this << " Already have some fragments, adding offset: " << FragOffset);
+      std::map<u_int32_t, BpBundle >::iterator itFrag = (*itBpFrag).second.find(FragOffset);
       if (itFrag != (*itBpFrag).second.end ())
       {
         NS_LOG_FUNCTION (this << " Bundle fragment already received. Dropping");
         return;
       }
-      (*itBpFrag).second.insert (std::pair<u_int32_t, Ptr<Packet> > (bpHeader.GetSequenceNumber ().GetValue (), bundle));
+      (*itBpFrag).second.insert (std::pair<u_int32_t, BpBundle > (FragOffset, bundle));
     }
     // test if bundle is now complete
     NS_LOG_FUNCTION (this << " Checking for complete bundle");
@@ -674,9 +736,11 @@ BundleProtocol::ProcessBundle (Ptr<Packet> bundle)
     for (auto& it : (*itBpFrag).second)
     {
       NS_LOG_FUNCTION (this << "inspecting fragment: " << it.second);
-      BpHeader fragBpHeader;
-      it.second->PeekHeader (fragBpHeader);
-      CurrentBundleLength += fragBpHeader.GetBlockLength ();
+      //BpHeader fragBpHeader;
+      //it.second->PeekHeader (fragBpHeader);
+      //CurrentBundleLength += fragBpHeader.GetBlockLength ();
+      BpPrimaryBlock fragBpPayloadBlock = it.second->GetPayloadBlock ();
+      CurrentBundleLength += fragBpPayloadBlock.GetBlockDataSize ();
       NS_LOG_FUNCTION (this << "CurrentBundleLength: " << CurrentBundleLength);
     }
     if (CurrentBundleLength != AduLength)
@@ -688,6 +752,10 @@ BundleProtocol::ProcessBundle (Ptr<Packet> bundle)
     // bundle is complete
     NS_LOG_FUNCTION (this << " Have complete bundle of size " << CurrentBundleLength);
     // Get first fragment and start building from there;
+    
+    // LEFT OFF HERE
+    // WITHOUT SEQUENCE NUMBERS, I NEED TO COMPARE FRAGMENTATION OFFSETS TO RECONSTRUCT THE BUNDLE!!
+
     u_int32_t FragSeqNum = 0;
     std::map<u_int32_t, Ptr<Packet> >::iterator itFrag = (*itBpFrag).second.find(FragSeqNum);
     bundle = (*itFrag).second;
