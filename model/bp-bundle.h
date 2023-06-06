@@ -103,6 +103,20 @@ public:
     BpPrimaryBlock GetPrimaryBlock () const;
 
     /**
+     * \brief Get a pointer to the bundle primary block
+     * 
+     * \return a pointer to the bundle primary block
+     */
+    BpPrimaryBlock *GetPrimaryBlockPtr ();
+
+    /**
+     * \brief Get a pointer to the payload block
+     * 
+     * \return a pointer to the payload block
+     */
+    BpCanonicalBlock *GetPayloadBlockPtr ();
+
+    /**
      * \brief Get the bundle extension block
      * 
      * \return the bundle extension block  // TODO:  change implementation to support several extension blocks

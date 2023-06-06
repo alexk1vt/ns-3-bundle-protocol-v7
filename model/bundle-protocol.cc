@@ -654,8 +654,8 @@ BundleProtocol::ProcessBundle (BpBundle bundle)
   //                            " src eid " << bpHeader.GetSourceEid ().Uri () << 
   //                            " dst eid " << bpHeader.GetDestinationEid ().Uri () << 
   //                            " packet size " << bundle->GetSize ());
-  NS_LOG_DEBUG ("Recv bundle: "<< " src eid " << bpPrimaryBlock.GetSourceEid ().Uri () << 
-                                 " dst eid " << bpPrimaryBlock.GetDestinationEid ().Uri ())
+  NS_LOG_DEBUG ("Recv bundle: "<< " src eid " << src.Uri () << 
+                                 " dst eid " << dst.Uri ())
 
   // the destination endpoint eid is registered? 
   std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.find (dst);
@@ -681,7 +681,8 @@ BundleProtocol::ProcessBundle (BpBundle bundle)
   }
   // check if this is part of a fragment
   //if (bpHeader.IsFragment ()){
-    if (bpPrimaryBlock.IsFragment ()){
+  if (bpPrimaryBlock.IsFragment ())
+  {
     // store all needed data from headers before we strip from them from fragments
     //time_t CreateTimeStamp = bpHeader.GetCreateTimestamp ();
     time_t CreateTimeStamp = bpPrimaryBlock.GetCreateTimestamp ();
@@ -716,6 +717,7 @@ BundleProtocol::ProcessBundle (BpBundle bundle)
     else
     {
       // some bundle fragments already received
+
       //u_int32_t fragSeqNum = bpHeader.GetSequenceNumber ().GetValue ();
       //NS_LOG_FUNCTION (this << " Already have some fragments, adding sequence number: " << fragSeqNum);
       //std::map<u_int32_t, Ptr<Packet> >::iterator itFrag = (*itBpFrag).second.find(fragSeqNum);
@@ -753,39 +755,62 @@ BundleProtocol::ProcessBundle (BpBundle bundle)
     NS_LOG_FUNCTION (this << " Have complete bundle of size " << CurrentBundleLength);
     // Get first fragment and start building from there;
     
-    // LEFT OFF HERE
     // WITHOUT SEQUENCE NUMBERS, I NEED TO COMPARE FRAGMENTATION OFFSETS TO RECONSTRUCT THE BUNDLE!!
 
-    u_int32_t FragSeqNum = 0;
-    std::map<u_int32_t, Ptr<Packet> >::iterator itFrag = (*itBpFrag).second.find(FragSeqNum);
-    bundle = (*itFrag).second;
-    bundle->PeekHeader (bpHeader);
-    CurrentBundleLength = bpHeader.GetBlockLength ();
-    FragSeqNum++;
-    for (; CurrentBundleLength < AduLength; FragSeqNum++)
+    //u_int32_t FragSeqNum = 0;
+    u_int32_t CurrFragOffset = 0;
+    std::string fragmentBuffer = "";
+    //std::map<u_int32_t, Ptr<Packet> >::iterator itFrag = (*itBpFrag).second.find(FragSeqNum);
+    std::map<u_int32_t, BpBundle >::iterator itFrag = (*itBpFrag).second.find(CurrFragOffset);  // Get the first fragment for this bundle
+
+    BpBundle fragmentBundle = (*itFrag).second;
+    //bundle->PeekHeader (bpHeader);
+    BpCanonicalBlock *payloadBlockPtr = bundle->GetPayloadBlockPtr ();
+    CurrentBundleLength = payloadBlockPtr->GetBlockDataSize ();
+    //CurrentBundleLength = bpHeader.GetBlockLength ();
+    fragmentBuffer += payloadBlockPtr->GetBlockData ();
+
+    // iterate through fragmentation map finding the next largest offset and add it's fragment to the bundle
+    //FragSeqNum++;
+    CurrFragOffset = CurrentBundleLength;
+    BpBundle bundleFragment;
+    //for (; CurrentBundleLength < AduLength; FragSeqNum++)
+    for (; CurrentBundleLength < AduLength; CurrFragOffset = CurrentBundleLength)
     {
-      itFrag = (*itBpFrag).second.find(FragSeqNum);
-      Ptr<Packet> bundleFragment = (*itFrag).second;
-      bundleFragment->PeekHeader (bpHeader);
-      CurrentBundleLength += bpHeader.GetBlockLength ();
+      //itFrag = (*itBpFrag).second.find(FragSeqNum);
+      itFrag = (*itBpFrag).second.find(CurrFragOffset);
+      //Ptr<Packet> bundleFragment = (*itFrag).second;
+      bundleFragment = (*itFrag).second;
+      //bundleFragment->PeekHeader (bpHeader);
+      payloadBlockPtr = bundleFragment->GetPayloadBlockPtr ();
+      //CurrentBundleLength += bpHeader.GetBlockLength ();
+      CurrentBundleLength += payloadBlockPtr->GetBlockDataSize ();
       // strip fragment headers
-      bundleFragment->RemoveHeader (bpHeader);
-      bundleFragment->RemoveHeader (bppHeader);
-      bundle->AddAtEnd(bundleFragment);
+      //bundleFragment->RemoveHeader (bpHeader);
+      //bundleFragment->RemoveHeader (bppHeader);
+      //bundle->AddAtEnd(bundleFragment);
+      fragmentBuffer += payloadBlockPtr->GetBlockData ();
+      // ***!!! LEFT OFF HERE !!!***
     }
+    // fragmentBuffer now contains the reconstructed ADU
+    payloadBlockPtr->SetBlockData (fragmentBuffer);  // replaced bundle ADU with reconstructed ADU
+    bpPrimaryBlock.SetIsFragment (false);
     // Now have reconstructed packet, delete fragment map
     BpRecvFragMap.erase (FragName);
   }
 
+  // CHANGE THIS TO STORE BUNDLES BASED ON SRC - NOT DST!!!!
   // store the bundle into persistant received storage
   std::map<BpEndpointId, std::queue<Ptr<Packet> > >::iterator itMap = BpRecvBundleStore.end ();
-  itMap = BpRecvBundleStore.find (dst);
+  //itMap = BpRecvBundleStore.find (dst);
+  itMap = BpRecvBundleStore.find (src);
   if ( itMap == BpRecvBundleStore.end ())
     {
       // this is the first bundle received by this destination endpoint id
       std::queue<Ptr<Packet> > qu;
       qu.push (bundle);
-      BpRecvBundleStore.insert (std::pair<BpEndpointId, std::queue<Ptr<Packet> > > (dst, qu) );
+      //BpRecvBundleStore.insert (std::pair<BpEndpointId, std::queue<Ptr<Packet> > > (dst, qu) );
+      BpRecvBundleStore.insert (std::pair<BpEndpointId, std::queue<Ptr<Packet> > > (src, qu) );
     }
   else
     {
@@ -795,6 +820,39 @@ BundleProtocol::ProcessBundle (BpBundle bundle)
 
 }
 
+// LEFT OFF HERE!!!
+// Replacement Receive function that doesn't not accept any parameters and returns a string of the ADU
+// This is the function that should be called by the application
+std::string
+BundleProtocol::Receive ()
+{
+  NS_LOG_FUNCTION (this);
+  std::string stringBuffer = "";
+  bool bundleFound = false;
+
+  for (auto const& iter : BpRecvBundleStore)
+  {
+    if ((*iter).second.size () > 0) 
+    {
+      bundleFound = true;
+      BpBundle = (*iter).second.front ();
+      BpCanonicalBlock *payloadBlockPtr = bundle->GetPayloadBlockPtr ();
+      stringBuffer += payloadBlockPtr->GetBlockData ();
+      (*iter).second.pop ();
+      return stringBuffer;
+    }
+    else
+    {
+      // no bundles in this queue
+      BpRecvBundleStore.erase (iter);
+      return stringBuffer;
+    }
+  }
+
+}
+
+
+// Which BpEndpointId is this using?  Why does it need one?  Should I have a separete function that just receives any?
 Ptr<Packet>
 BundleProtocol::Receive (const BpEndpointId &eid)
 { 

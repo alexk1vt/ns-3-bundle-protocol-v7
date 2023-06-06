@@ -92,6 +92,13 @@ public:
     void SetBlockData (std::string data);
 
     /**
+     * \brief Add data to block data
+     * 
+     * \param data the data to add
+    */
+    void AddBlockData (std::string data);
+
+    /**
      * \brief Rebuild the canonical block with current configured values
     */
     void RebuildCanonicalBlock ();
