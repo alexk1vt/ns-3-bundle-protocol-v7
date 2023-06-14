@@ -18,6 +18,9 @@ def build(bld):
         'model/bp-routing-protocol.cc',
         'model/bp-static-routing-protocol.cc',
         'model/sdnv.cc',
+        'model/bp-bundle.cc',
+        'model/bp-canonical-block.cc',
+        'model/bp-primary-block.cc',
         'helper/bundle-protocol-helper.cc',
         'helper/bundle-protocol-container.cc',
         ]
@@ -39,6 +42,10 @@ def build(bld):
         'model/bp-routing-protocol.h',
         'model/bp-static-routing-protocol.h',
         'model/sdnv.h',
+        'model/bp-bundle.h',
+        'model/bp-canonical-block.h',
+        'model/bp-primary-block.h',
+        'model/json.hpp',
         'helper/bundle-protocol-helper.h',
         'helper/bundle-protocol-container.h',
         ]

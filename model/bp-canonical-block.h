@@ -46,9 +46,18 @@ class BpCanonicalBlock
 {
 public:
   BpCanonicalBlock ();
+  BpCanonicalBlock (uint8_t code, uint32_t number, uint64_t flags, uint8_t crcType, std::string data);
+  BpCanonicalBlock(uint8_t blockTypeCode, uint32_t payloadSize, const uint8_t *payloadData);
   virtual ~BpCanonicalBlock ();
 
   // Setters
+    /**
+     * \brief Set the canonical block from json
+     * 
+     * \param jsonCanonicalBlock the canonical block in json
+     */
+    void SetCanonicalBlockFromJson (json jsonCanonicalBlock);
+
     /**
      * \brief Set the block type code of the canonical block
      *
@@ -101,7 +110,7 @@ public:
     /**
      * \brief Rebuild the canonical block with current configured values
     */
-    void RebuildCanonicalBlock ();
+    void RebuildBlock ();
 
   // Getters
     /**
@@ -172,12 +181,12 @@ public:
     } BlockProcessingFlags;
 
 private:
-    uint8_t m_blockTypeCode;                // block type code
-    uint32_t m_blockNumber;                 // block number
-    uint64_t m_blockProcessingFlags;        // block processing control flags
-    uint8_t m_crcType;                      // CRC Type
-    uint32_t m_crcValue;                    // CRC of primary block
-    String m_blockData;                     // block data
+    uint8_t m_blockTypeCode;                // block type code "block_type_code"
+    uint32_t m_blockNumber;                 // block number "block_number"
+    uint64_t m_blockProcessingFlags;        // block processing control flags "block_processing_flags"
+    uint8_t m_crcType;                      // CRC Type "crc_type"
+    uint32_t m_crcValue;                    // CRC of primary block "crc_value"
+    std::string m_blockData;                     // block data "block_data"
 
     // the canonical block, section 4.3.2, RFC 9171
     json m_canonical_block;                 // canonical block

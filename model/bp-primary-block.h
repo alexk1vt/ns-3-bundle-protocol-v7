@@ -46,9 +46,17 @@ class BpPrimaryBlock
 {
 public:
   BpPrimaryBlock ();
+  BpPrimaryBlock(BpEndpointId src, BpEndpointId dst, uint32_t payloadSize);
   virtual ~BpPrimaryBlock ();
 
   // Setters
+    /**
+     * \brief Set the Primary Block from JSON
+     * 
+     * \param jsonPrimaryBlock the Primary Block in JSON format
+     */
+    void SetPrimaryBlockFromJson (json jsonPrimaryBlock);
+
     /**
      * \brief Set the version of bundle protocol
      *
@@ -89,14 +97,14 @@ public:
      * 
      * \param timestamp the creation timestamp
      */
-    void SetCreateTimestamp (const std::time_t &timestamp); // NOTE: Parameter is not correct - TODO: reference Section 4.2.7 of RFC 9171 for proper definition of timestamp
+    void SetCreationTimestamp (const std::time_t &timestamp); // NOTE: Parameter is not correct - TODO: reference Section 4.2.7 of RFC 9171 for proper definition of timestamp
 
     /**
      * \brief Set the lifetime of the bundle payload
      * 
      * \param lifetime the lifetime of the bundle payload
      */
-    void SetLifeTime (uint32_t lifetime);
+    void SetLifetime (uint32_t lifetime);
 
     /**
      * \brief Set the Fragment offset (only if bundle is a fragment)
@@ -192,7 +200,7 @@ public:
     /**
      * \brief Rebuild the primary bundle block with current configured values
     */
-    void RebuildPrimaryBundleBlock ();
+    void RebuildBlock ();
 
   // Getters
 
@@ -234,12 +242,12 @@ public:
     /**
      * \return The creation timestamp
      */
-    std::time_t GetCreateTimestamp () const; // NOTE: Return type is not correct - TODO: reference Section 4.2.7 of RFC 9171 for proper definition of timestamp
+    std::time_t GetCreationTimestamp () const; // NOTE: Return type is not correct - TODO: reference Section 4.2.7 of RFC 9171 for proper definition of timestamp
 
     /**
      * \return The lifetime of the bundle payload
      */
-    uint32_t GetLifeTime () const;
+    uint32_t GetLifetime () const;
 
     /**
      * \return The Fragment offset (only if bundle is a fragment)
@@ -289,17 +297,17 @@ public:
     } BundleProcessingFlags;
 
 private:
-    uint8_t m_version;                      // the version of bundle protocol
-    uint64_t m_processingFlags;             // bundle processing control flags
-    BpEndpointId m_destEndpointId;          // destination endpoint id
-    BpEndpointId m_sourceEndpointId;        // source endpoint id
-    BpEndpointId m_reportToEndPointId;      // report endpoint id
-    std::time_t m_creationTimestamp;        // creation time NOTE: Parameter is not correct - TODO: reference Section 4.2.7 of RFC 9171 for proper definition of timestamp
-    uint32_t m_lifetime;                    // lifetime in seconds
-    uint32_t m_fragmentOffset;              // fragementation offset
-    uint32_t m_aduLength;                   // application data unit length
-    uint8_t m_crcType;                      // CRC Type
-    uint32_t m_crcValue;                    // CRC of primary block
+    uint8_t m_version;                      // the version of bundle protocol "version"
+    uint64_t m_processingFlags;             // bundle processing control flags "processing_flags"
+    BpEndpointId m_destEndpointId;          // destination endpoint id "destination"
+    BpEndpointId m_sourceEndpointId;        // source endpoint id "source"
+    BpEndpointId m_reportToEndPointId;      // report endpoint id "report_to"
+    std::time_t m_creationTimestamp;        // creation time "creation_timestamp" NOTE: Parameter is not correct - TODO: reference Section 4.2.7 of RFC 9171 for proper definition of timestamp
+    uint32_t m_lifetime;                    // lifetime in seconds "lifetime"
+    uint32_t m_fragmentOffset;              // fragementation offset "fragment_offset"
+    uint32_t m_aduLength;                   // application data unit length "adu_length"
+    uint8_t m_crcType;                      // CRC Type "crc_type"
+    uint32_t m_crcValue;                    // CRC of primary block "crc_value"
 
     // primary bundle block, section 4.3.1, RFC 9171
     json m_primary_bundle_block;            // primary bundle block

@@ -54,15 +54,16 @@ BpPrimaryBlock::BpPrimaryBlock ()
     m_reportToEndPointId = BpEndpointId ();
 
     // set creation timestamp to current time
-    SetCreationTimestamp (time (NULL));
+    m_creationTimestamp = std::time (NULL) - RFC_DATE_2000;
+    // from bp-header.cc:  m_createTimestamp = timestamp - RFC_DATE_2000;
 
     // build the json primary block - ordering is specified in RFC 9171 and remains consistent with the order of the primary block fields
     m_primary_bundle_block["version"] = m_version;
     m_primary_bundle_block["processing_flags"] = m_processingFlags;
     m_primary_bundle_block["crc_type"] = m_crcType;
-    m_primary_bundle_block["destination"] = m_destEndpointId.GetEidString ();
-    m_primary_bundle_block["source"] = m_sourceEndpointId.GetEidString ();
-    m_primary_bundle_block["report_to"] = m_reportToEndPointId.GetEidString ();
+    m_primary_bundle_block["destination"] = m_destEndpointId.Uri (); //.GetEidString ();
+    m_primary_bundle_block["source"] = m_sourceEndpointId.Uri (); //.GetEidString ();
+    m_primary_bundle_block["report_to"] = m_reportToEndPointId.Uri (); //.GetEidString ();
     m_primary_bundle_block["creation_timestamp"] = m_creationTimestamp;
     m_primary_bundle_block["lifetime"] = m_lifetime;
     if (m_processingFlags & BUNDLE_IS_FRAGMENT)
@@ -75,9 +76,69 @@ BpPrimaryBlock::BpPrimaryBlock ()
     //   m_primary_bundle_block["crc_value"] = m_crcValue;
 }
 
+BpPrimaryBlock::BpPrimaryBlock(BpEndpointId src, BpEndpointId dst, uint32_t payloadSize)
+    : m_version (0x7),
+    m_processingFlags (0),
+    m_creationTimestamp (0),
+    m_lifetime (0),
+    m_fragmentOffset (0),
+    m_aduLength (payloadSize),
+    m_crcType (0),
+    m_crcValue (0)
+{
+    NS_LOG_FUNCTION (this);
+    m_sourceEndpointId = src;
+    m_destEndpointId = dst;
+
+    // set creation timestamp to current time
+    m_creationTimestamp = std::time (NULL) - RFC_DATE_2000;
+
+    // build the json primary block - ordering is specified in RFC 9171 and remains consistent with the order of the primary block fields
+    m_primary_bundle_block["version"] = m_version;
+    m_primary_bundle_block["processing_flags"] = m_processingFlags;
+    m_primary_bundle_block["crc_type"] = m_crcType;
+    m_primary_bundle_block["destination"] = m_destEndpointId.Uri (); //.GetEidString ();
+    m_primary_bundle_block["source"] = m_sourceEndpointId.Uri (); //.GetEidString ();
+    m_primary_bundle_block["report_to"] = m_reportToEndPointId.Uri (); //.GetEidString ();
+    m_primary_bundle_block["creation_timestamp"] = m_creationTimestamp;
+    m_primary_bundle_block["lifetime"] = m_lifetime;
+    if (m_processingFlags & BUNDLE_IS_FRAGMENT)
+    {
+        m_primary_bundle_block["fragment_offset"] = m_fragmentOffset;
+    }
+    m_primary_bundle_block["adu_length"] = m_aduLength;
+}
+
 BpPrimaryBlock::~BpPrimaryBlock ()
 {
     NS_LOG_FUNCTION (this);
+}
+
+void
+BpPrimaryBlock::SetPrimaryBlockFromJson (json jsonPrimaryBlock)
+{
+    NS_LOG_FUNCTION (this << jsonPrimaryBlock.dump ());
+    m_primary_bundle_block = jsonPrimaryBlock;
+    m_version = m_primary_bundle_block["version"];
+    m_processingFlags = m_primary_bundle_block["processing_flags"];
+    m_crcType = m_primary_bundle_block["crc_type"];
+    BpEndpointId tempEid(m_primary_bundle_block["destination"]);
+    m_destEndpointId = tempEid;
+    tempEid = BpEndpointId(m_primary_bundle_block["source"]);
+    m_sourceEndpointId = tempEid;
+    if (m_primary_bundle_block.contains("report_to"))
+    {
+        tempEid = BpEndpointId(m_primary_bundle_block["report_to"]);
+        m_reportToEndPointId = tempEid;
+    }
+    m_creationTimestamp = m_primary_bundle_block["creation_timestamp"];
+    m_lifetime = m_primary_bundle_block["lifetime"];
+    if (m_processingFlags & BUNDLE_IS_FRAGMENT)
+    {
+        m_fragmentOffset = m_primary_bundle_block["fragment_offset"];
+    }
+    m_aduLength = m_primary_bundle_block["adu_length"];
+    //if (m_crcType != 0) // TODO:  Implement this!
 }
 
 void
@@ -88,35 +149,35 @@ BpPrimaryBlock::SetVersion (uint8_t ver)
 }
 
 void
-BpPrimaryBlock::SetProcessingFlags (uint8_t flags) // NOTE: not properly implemented - TODO: reference RFC 9171
+BpPrimaryBlock::SetProcessingFlags (uint64_t flags) // NOTE: not properly implemented - TODO: reference RFC 9171
 {
     NS_LOG_FUNCTION (this << (int) flags);
     m_processingFlags = flags;
 }
 
 void
-BpPrimaryBlock::SetDestinationEid (BpEndpointId eid)
+BpPrimaryBlock::SetDestinationEid (const BpEndpointId &eid)
 {
-    NS_LOG_FUNCTION (this << eid);
+    NS_LOG_FUNCTION (this << eid.Uri ());
     m_destEndpointId = eid;
 }
 
 void
-BpPrimaryBlock::SetSourceEid (BpEndpointId eid)
+BpPrimaryBlock::SetSourceEid (const BpEndpointId &eid)
 {
-    NS_LOG_FUNCTION (this << eid);
+    NS_LOG_FUNCTION (this << eid.Uri ());
     m_sourceEndpointId = eid;
 }
 
 void
-BpPrimaryBlock::SetReportToEid (BpEndpointId eid)
+BpPrimaryBlock::SetReportEid (const BpEndpointId &eid)
 {
-    NS_LOG_FUNCTION (this << eid);
+    NS_LOG_FUNCTION (this << eid.Uri ());
     m_reportToEndPointId = eid;
 }
 
 void
-BpPrimaryBlock::SetCreationTimestamp (time_t timestamp) // // NOTE: Parameter is not correct - TODO: reference Section 4.2.7 of RFC 9171 for proper definition of timestamp
+BpPrimaryBlock::SetCreationTimestamp (const std::time_t &timestamp) // // NOTE: Parameter is not correct - TODO: reference Section 4.2.7 of RFC 9171 for proper definition of timestamp
 {
     NS_LOG_FUNCTION (this << timestamp);
     m_creationTimestamp = timestamp;
@@ -284,16 +345,16 @@ BpPrimaryBlock::SetDeletionReportRequest (bool reportRequest)
 }
 
 void
-BpPrimaryBlock::RebuildPrimaryBundleBlock ()
+BpPrimaryBlock::RebuildBlock ()
 {
     NS_LOG_FUNCTION (this);
     // rebuild the json primary block - ordering is specified in RFC 9171 and remains consistent with the order of the primary block fields
     m_primary_bundle_block["version"] = m_version;
     m_primary_bundle_block["processing_flags"] = m_processingFlags;
     m_primary_bundle_block["crc_type"] = m_crcType;
-    m_primary_bundle_block["destination"] = m_destEndpointId.GetEidString ();
-    m_primary_bundle_block["source"] = m_sourceEndpointId.GetEidString ();
-    m_primary_bundle_block["report_to"] = m_reportToEndPointId.GetEidString ();
+    m_primary_bundle_block["destination"] = m_destEndpointId.Uri (); //GetEidString ();
+    m_primary_bundle_block["source"] = m_sourceEndpointId.Uri (); //.GetEidString ();
+    m_primary_bundle_block["report_to"] = m_reportToEndPointId.Uri (); //.GetEidString ();
     m_primary_bundle_block["creation_timestamp"] = m_creationTimestamp;
     m_primary_bundle_block["lifetime"] = m_lifetime;
     if (m_processingFlags & BUNDLE_IS_FRAGMENT)
@@ -408,10 +469,12 @@ uint32_t
 BpPrimaryBlock::CalcCrcValue () const
 {
     NS_LOG_FUNCTION (this);
-    std::vector <std::uint8_t> m_primary_block_cbor_encoding = json.to_cbor(m_primary_bundle_block); // CBOR encoding of the primary bundle block -- needed for CRC calculation
+    std::vector <std::uint8_t> m_primary_block_cbor_encoding = json::to_cbor(m_primary_bundle_block); // CBOR encoding of the primary bundle block -- needed for CRC calculation
+    // TODO:  Implement CRC calculation
     // remove CRC value from field (if present) (replace with zeros), then encode block in CBOR
     // calculate CRC value based on CRC type from CBOR encoding
     // restore original CrcValue to field and return newly calculated CRC value
+    return 0;
 }
     
 } // namespace ns3

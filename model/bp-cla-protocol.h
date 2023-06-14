@@ -22,6 +22,7 @@
 #define BP_CLA_PROTOCOL_H
 
 #include "ns3/object.h"
+#include "bp-bundle.h"
 
 namespace ns3 {
 
@@ -61,6 +62,13 @@ public:
    * \param packet packet to send
    */
   virtual int SendPacket (Ptr<Packet> packet) = 0;
+
+  /**
+   * send bundle to the transport layer
+   * 
+   * \param bundle bundle to send
+  */
+  virtual int SendBundle (Ptr<BpBundle> bundle) = 0;
 
   /**
    * Connect BundleProtocol object to CLA

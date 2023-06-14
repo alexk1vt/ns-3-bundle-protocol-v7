@@ -40,8 +40,12 @@ BpEndpointId::BpEndpointId (const std::string uri)
   : m_uri ("")
 { 
   NS_LOG_FUNCTION (this << " " << uri);
-  ParseUri (uri);
-  m_uri = uri;
+  if (!uri.empty())
+  {
+    ParseUri (uri);
+    m_uri = uri;
+  }
+  
 }
 
 void 

@@ -29,6 +29,7 @@
 #include "ns3/packet.h"
 #include "bundle-protocol.h"
 #include "bp-routing-protocol.h"
+#include "bp-bundle.h"
 #include <map>
 
 namespace ns3 {
@@ -59,6 +60,13 @@ public:
    * \param packet packet to sent
    */
   virtual int SendPacket (Ptr<Packet> packet);
+
+  /**
+   * send bundle to the transport layer
+   * 
+   * \param bundle bundle to send
+   */
+  virtual int SendBundle (Ptr<BpBundle> bundle);
 
   /**
    * Set the TCP socket in listen state;
@@ -99,6 +107,13 @@ public:
    * the bunle. Otherwise, it returns the socket.
    */
   virtual Ptr<Socket> GetL4Socket (Ptr<Packet> packet);
+
+  /**
+   * \brief Get the transport layer socket when given a bundle
+   * 
+   * \param bundle the bundle required to be transmitted
+  */
+  Ptr<Socket> GetL4Socket (Ptr<BpBundle> bundle);
 
   
   virtual bool RemoveL4Socket (Ptr<Socket> socket);
@@ -201,7 +216,7 @@ private:
 
   //virtual void ResendPacket (Ptr<Packet> packet);
 
-  virtual void RetrySocketConn (Ptr<Packet> packet);
+  virtual void RetrySocketConn (Ptr<BpBundle> packet);
 
 private:
   Ptr<BundleProtocol> m_bp;                             /// bundle protocol
@@ -216,7 +231,7 @@ private:
                                                     // 4 - Connection closed by error
                                                     // 5 - No status
   std::map<Ptr<Socket>, InetSocketAddress> m_SendSocketL4Addresses; // map of destination addresses to corresponding sockets (since you cant query sockets for the remote address they are connected to)
-  std::map<InetSocketAddress, std::queue<Ptr<Packet> > > SocketAddressSendQueue; // storage of packets going to a particular L4 address while waiting for TCP sessions to be built
+  std::map<InetSocketAddress, std::queue<Ptr<BpBundle> > > SocketAddressSendQueue; // storage of packets going to a particular L4 address while waiting for TCP sessions to be built
   Ptr<BpRoutingProtocol> m_bpRouting;                   /// bundle routing protocol
 };
 

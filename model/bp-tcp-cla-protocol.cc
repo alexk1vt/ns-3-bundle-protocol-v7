@@ -40,6 +40,7 @@
 #include "bp-static-routing-protocol.h"
 #include "bp-header.h"
 #include "bp-endpoint-id.h"
+#include "bp-bundle.h"
 #include "ns3/tcp-socket-factory.h"
 #include "ns3/inet-socket-address.h"
 #include "ns3/packet.h"
@@ -87,9 +88,34 @@ BpTcpClaProtocol::SetBundleProtocol (Ptr<BundleProtocol> bundleProtocol)
   m_bp = bundleProtocol;
 }
 
+// Does the same as GetL4Socket (Ptr<Packet> packet) but with a bundlePtr
+Ptr<Socket>
+BpTcpClaProtocol::GetL4Socket (Ptr<BpBundle> bundlePtr)
+{
+  NS_LOG_FUNCTION (this << " " << bundlePtr);
+  BpPrimaryBlock *bpPrimaryBlockPtr = bundlePtr->GetPrimaryBlockPtr ();
+  BpEndpointId dst = bpPrimaryBlockPtr->GetDestinationEid ();
+  BpEndpointId src = bpPrimaryBlockPtr->GetSourceEid ();
+
+  std::map<BpEndpointId, Ptr<Socket> >::iterator it = m_l4SendSockets.find (src);
+  if (it == m_l4SendSockets.end ())
+  {
+      // enable a tcp connection from the src endpoint id to the dst endpoint id
+      if (EnableSend (src, dst) < 0)
+        return NULL;
+
+      // update because EnableSende () add new socket into m_l4SendSockets
+      it = m_l4SendSockets.find (src);
+  }
+
+  return ((*it).second);
+}
+
 Ptr<Socket>
 BpTcpClaProtocol::GetL4Socket (Ptr<Packet> packet)
 { 
+  return NULL;  // AlexK. - this function is not used in the current implementation
+  /*
   NS_LOG_FUNCTION (this << " " << packet);
   BpHeader bph;
   packet->PeekHeader (bph);
@@ -108,6 +134,7 @@ BpTcpClaProtocol::GetL4Socket (Ptr<Packet> packet)
   }
 
   return ((*it).second);
+  */
 }
 
 bool
@@ -186,7 +213,7 @@ BpTcpClaProtocol::SetSendSocketAddress(Ptr<Socket> socket, InetSocketAddress add
   return;
 }
 
-void
+/*void
 BpTcpClaProtocol::RetrySocketConn (Ptr<Packet> packet)
 {
   NS_LOG_FUNCTION (this << " " << packet);
@@ -198,11 +225,92 @@ BpTcpClaProtocol::RetrySocketConn (Ptr<Packet> packet)
     NS_LOG_FUNCTION (this << " Unable to create new socket for packet: " << packet);
     return;
   }
+}*/
+
+void
+BpTcpClaProtocol::RetrySocketConn (Ptr<BpBundle> bundle)
+{
+  NS_LOG_FUNCTION (this << " " << bundle);
+  // redo the SendPacket without interacting with BpSendStore
+
+  Ptr<Socket> socket = GetL4Socket (bundle);
+  if (socket == NULL)
+  {
+    NS_LOG_FUNCTION (this << " Unable to create new socket for packet: " << bundle);
+    return;
+  }
+}
+
+// Does the same as SendPacket (Ptr<Packet> packet) but with a bundlePtr
+int
+BpTcpClaProtocol::SendBundle (Ptr<BpBundle> bundlePtr)
+{
+  NS_LOG_FUNCTION (this << " " << bundlePtr);
+  Ptr<Socket> socket = GetL4Socket (bundlePtr);
+
+  if ( socket == NULL)
+    return -1;
+
+  // retreive bundles from queue in BundleProtocol
+  BpPrimaryBlock *bpPrimaryBlockPtr = bundlePtr->GetPrimaryBlockPtr ();
+  BpEndpointId src = bpPrimaryBlockPtr->GetSourceEid ();
+  BpEndpointId dst = bpPrimaryBlockPtr->GetDestinationEid ();
+  Ptr<BpBundle> bundle = m_bp->GetBundle (src); // this is retrieved again here in order to pop the packet from the SendBundleStore! -- TODO: FIX THIS!!
+
+  if (bundle)
+    {
+      if (GetL4SocketStatus (socket) == 0)
+      {
+        // tcp session g2g, send immediately
+        // Create a packet to place on the wire using CBOR encoded bundle as payload
+        uint32_t cborSize = bundle->GetCborEncodingSize ();
+        Ptr<Packet> packet = Create<Packet> (reinterpret_cast<uint8_t*>(bundle->GetCborEncoding ()[0]), cborSize);
+        BpBundleHeader bundleHeader;
+        bundleHeader.SetBundleSize (cborSize);
+        packet->AddHeader (bundleHeader);
+        NS_LOG_FUNCTION (this << " Sending packet sent from eid: " << src.Uri () << " to eid: " << dst.Uri () << " immediately");
+        if (socket->Send (packet) < 0)
+        {
+          // socket error sending packet
+          NS_LOG_FUNCTION (this << " Socket error sending packet");
+          return 1;
+        }
+        return 0;
+      }
+      else // tcp session not yet ready, store for later sending
+      {
+        InetSocketAddress address = GetSendSocketAddress (socket);
+        // !! TEST FOR BAD ADDRESS
+        
+        NS_LOG_FUNCTION (this << " BpNode " << m_bp << " with eid " << m_bp->GetBpEndpointId ().Uri () << " Placing packet sent from eid: " << src.Uri () << " to eid: " << dst.Uri () << " into queue for later sending with address: " << address);
+        NS_LOG_FUNCTION (this << " checking map at location: " << &SocketAddressSendQueue << "with size of: " << SocketAddressSendQueue.size());
+
+        std::map<InetSocketAddress, std::queue<Ptr<BpBundle> > >::iterator it = SocketAddressSendQueue.find(address);
+        if ( it == SocketAddressSendQueue.end ())
+        {
+          // this is the first packet being sent to this address
+          std::queue<Ptr<BpBundle> > qu;
+          qu.push (bundle);
+          SocketAddressSendQueue.insert (std::pair<InetSocketAddress, std::queue<Ptr<BpBundle> > > (address, qu) );
+          NS_LOG_FUNCTION (this << " built new queue for target address.  Queue address: " << &qu);
+        }
+      else
+        {
+          // ongoing packet
+          (*it).second.push (bundle);
+          NS_LOG_FUNCTION (this << " queue now has " << ((*it).second).size () << " items at address: " << &((*it).second));
+        }
+      }
+    }
+  NS_LOG_FUNCTION (this << " Unable to get bundle for eid: " << src.Uri ());
+  return -1;
 }
 
 int
 BpTcpClaProtocol::SendPacket (Ptr<Packet> packet)
 { 
+  return 0; // AlexK. This is not used anymore, see SendBundle (Ptr<BpBundle> bundlePtr)
+  /*
   NS_LOG_FUNCTION (this << " " << packet);
   Ptr<Socket> socket = GetL4Socket (packet);
 
@@ -257,6 +365,7 @@ BpTcpClaProtocol::SendPacket (Ptr<Packet> packet)
     }
   NS_LOG_FUNCTION (this << " Unable to get bundle for eid: " << src.Uri ());
   return -1;
+  */
 }
 
 int
@@ -433,7 +542,7 @@ BpTcpClaProtocol::ConnectionFailed (Ptr<Socket> socket)
   // !! TEST IF GIVEN BAD ADDRESS
   
   NS_LOG_FUNCTION(this << " was intended for address: " << address);
-  std::map<InetSocketAddress, std::queue<Ptr<Packet> > >::iterator it = SocketAddressSendQueue.find (address); 
+  std::map<InetSocketAddress, std::queue<Ptr<BpBundle> > >::iterator it = SocketAddressSendQueue.find (address); 
   if ( it == SocketAddressSendQueue.end ())
   {
     NS_LOG_FUNCTION (this << " Did not find packet in SocketAddressSendQueue for address: " << address);
@@ -445,7 +554,7 @@ BpTcpClaProtocol::ConnectionFailed (Ptr<Socket> socket)
     NS_LOG_FUNCTION (this << " Found queue in SocketAddressSendQueue for address: " << address << " but is empty");
     return;
   }
-  Ptr<Packet> packet = ((*it).second).front ();
+  Ptr<BpBundle> bundle = ((*it).second).front ();
   // retrieved packet from socket send queue, now ok to remove records of socket and close
   NS_LOG_FUNCTION (this << " packets remaining to send, clearing out old socket and attempting resend");
   if (!RemoveL4Socket (socket))
@@ -457,7 +566,7 @@ BpTcpClaProtocol::ConnectionFailed (Ptr<Socket> socket)
   
   // socket records removed, now try to resend
   //ResendPacket(packet);
-  RetrySocketConn (packet);
+  RetrySocketConn (bundle);
 }
 
 void 
@@ -612,7 +721,7 @@ BpTcpClaProtocol::m_send (Ptr<Socket> socket)
 
   while (true)
   {
-    std::map<InetSocketAddress, std::queue<Ptr<Packet> > >::iterator it = SocketAddressSendQueue.find (address); 
+    std::map<InetSocketAddress, std::queue<Ptr<BpBundle> > >::iterator it = SocketAddressSendQueue.find (address); 
     if ( it == SocketAddressSendQueue.end ())
     {
       NS_LOG_FUNCTION (this << " Did not find packet in SocketAddressSendQueue for address: " << address);
@@ -625,9 +734,47 @@ BpTcpClaProtocol::m_send (Ptr<Socket> socket)
         NS_LOG_FUNCTION (this << " Found queue in SocketAddressSendQueue for address: " << address << " but is empty");
         return;
       }
-      Ptr<Packet> packet = ((*it).second).front ();
+      Ptr<BpBundle> bundle = ((*it).second).front ();
       ((*it).second).pop (); // remove packet from queue
       NS_LOG_FUNCTION (this << " Sending packet to address: " << address << " immediately");
+      // Create packet to send on the wire with bundle cbor encoding as payload
+      std::vector <std::uint8_t> cborEncodedBundle = bundle->GetCborEncoding ();
+      uint32_t cborSize = bundle->GetCborEncodingSize ();
+      NS_LOG_FUNCTION (this << " Sending bundle with cborSize: " << cborSize);
+      //uint32_t elementCount = cborEncodedBundle.size();
+      //uint32_t calculatedSize = elementCount * sizeof(uint8_t);
+      //NS_LOG_FUNCTION (this << " Recalcuated cbor size: " << calculatedSize);
+      //Ptr<Packet> packet = Create<Packet> (reinterpret_cast<uint8_t*>(&cborEncodedBundle[0]), cborSize);
+      Ptr<Packet> packet = Create<Packet> (reinterpret_cast<uint8_t*>(&cborEncodedBundle[0]), cborSize);
+      BpBundleHeader bundleHeader;
+      bundleHeader.SetBundleSize (cborSize);
+      packet->AddHeader (bundleHeader);
+      NS_LOG_FUNCTION (this << " Sending packet with size: " << packet->GetSize () << " header reports: " << bundleHeader);
+      // *** Testing ***
+      /*
+      // Make a copy of the packet
+      Ptr<Packet> testPacket = Create<Packet> (reinterpret_cast<uint8_t*>(&cborEncodedBundle[0]), cborSize);
+      testPacket->AddHeader (bundleHeader);
+      // now strip packet down like it's being received
+      BpBundleHeader testBundleHeader;
+      packet->PeekHeader (testBundleHeader);
+      uint32_t testCborBundleSize = testBundleHeader.GetBundleSize ();
+      packet->RemoveHeader (testBundleHeader);
+      NS_LOG_FUNCTION (this << "  ::Testing:: packet header reports CBOR bundle size of: " << testCborBundleSize);
+      uint8_t testBuffer[testCborBundleSize];
+      packet->CopyData (testBuffer, testCborBundleSize);
+      std::vector <uint8_t> testV_buffer (testBuffer, testBuffer + testCborBundleSize);
+      CompareCborBytesToVector(cborEncodedBundle, testV_buffer);
+      NS_LOG_FUNCTION (this <<" cborEncoded Bundle dump:");
+      PrintCborBytes(cborEncodedBundle);
+      NS_LOG_FUNCTION (this << " testV_buffer dump:");
+      PrintCborBytes (testV_buffer);
+      //Ptr<BpBundle> testBundle = Create<BpBundle> ();
+      //testBundle->SetBundleFromCbor (bundle->GetCborEncoding ());
+      //NS_LOG_FUNCTION (this << " Testing: bundle cbor bytes:");
+      //testBundle->PrintCborBytes ();
+      */
+      // *** End Testing ***
       if (socket->Send (packet) < 0)
       {
         // socket error sending packet
@@ -642,7 +789,7 @@ BpTcpClaProtocol::SocketAddressSendQueueEmpty (InetSocketAddress address)
 {
   NS_LOG_FUNCTION (this << " " << address << " checking map at location: " << &SocketAddressSendQueue << "with size of: " << SocketAddressSendQueue.size());
 
-  std::map<InetSocketAddress, std::queue<Ptr<Packet> > >::iterator it = SocketAddressSendQueue.find (address); 
+  std::map<InetSocketAddress, std::queue<Ptr<BpBundle> > >::iterator it = SocketAddressSendQueue.find (address); 
   if ( it == SocketAddressSendQueue.end ())
   {
     NS_LOG_FUNCTION (this << " Did not find packet in SocketAddressSendQueue for address: " << address);

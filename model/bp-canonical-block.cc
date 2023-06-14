@@ -70,9 +70,45 @@ BpCanonicalBlock::BpCanonicalBlock (uint8_t code, uint32_t number, uint64_t flag
     m_canonical_block["block_data"] = m_blockData;
 }
 
+BpCanonicalBlock::BpCanonicalBlock(uint8_t blockTypeCode, uint32_t payloadSize, const uint8_t *payloadData)
+    : m_blockTypeCode (blockTypeCode),
+      m_blockNumber (0),
+      m_blockProcessingFlags (0),
+      m_crcType (0),
+      m_crcValue (0),
+      m_blockData ("")
+{
+    NS_LOG_FUNCTION (this);
+    // copy the payload data into the block data
+    for (int i = 0; i < payloadSize; i++)
+    {
+        m_blockData += reinterpret_cast<const unsigned char> (payloadData[i]);
+    }
+    m_canonical_block["block_type_code"] = m_blockTypeCode;
+    m_canonical_block["block_number"] = m_blockNumber;
+    m_canonical_block["block_processing_flags"] = m_blockProcessingFlags;
+    m_canonical_block["crc_type"] = m_crcType;
+    // m_canonical_block["crc_value"] = m_crcValue; //TODO:  calculate CRC value
+    m_canonical_block["block_data"] = m_blockData;
+}
+
 BpCanonicalBlock::~BpCanonicalBlock ()
 {
     NS_LOG_FUNCTION (this);
+}
+
+void
+BpCanonicalBlock::SetCanonicalBlockFromJson (json jsonCanonicalBlock)
+{
+    NS_LOG_FUNCTION (this << jsonCanonicalBlock.dump ());
+    m_canonical_block = jsonCanonicalBlock;
+    m_blockTypeCode = m_canonical_block["block_type_code"];
+    m_blockNumber = m_canonical_block["block_number"];
+    m_blockProcessingFlags = m_canonical_block["block_processing_flags"];
+    m_crcType = m_canonical_block["crc_type"];
+    // m_crcValue = m_canonical_block["crc_value"]; //TODO:  calculate CRC value
+    //if (m_crcType != 0) // TODO:  Implement this!
+    m_blockData = m_canonical_block["block_data"];
 }
 
 void
@@ -111,7 +147,7 @@ BpCanonicalBlock::SetBlockData (std::string data)
 }
 
 void
-BpCanonicalBlock::RebuildCanonicalBlock ()
+BpCanonicalBlock::RebuildBlock ()
 {
     NS_LOG_FUNCTION (this);
     m_canonical_block["block_type_code"] = m_blockTypeCode;
@@ -151,7 +187,7 @@ BpCanonicalBlock::GetCrcType () const
 }
 
 uint32_t
-BpCanonicalBlock::GetCrcValue () const;
+BpCanonicalBlock::GetCrcValue () const
 {
     NS_LOG_FUNCTION (this);
     return m_crcValue;
@@ -182,7 +218,7 @@ uint32_t
 BpCanonicalBlock::CalcCrcValue () const
 {
     NS_LOG_FUNCTION (this);
-    std::vector <std::uint8_t> m_canonical_block_cbor_encoding = json.to_cbor(m_canonical_block); // CBOR encoding of the primary bundle block -- needed for CRC calculation
+    std::vector <std::uint8_t> m_canonical_block_cbor_encoding = json::to_cbor(m_canonical_block); // CBOR encoding of the primary bundle block -- needed for CRC calculation
     // remove CRC value from field (if present) (replace with zeros), then encode block in CBOR
     // calculate CRC value based on CRC type from CBOR encoding
     // restore original CrcValue to field and return newly calculated CRC value

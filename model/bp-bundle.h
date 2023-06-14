@@ -32,11 +32,55 @@
 #include "ns3/sequence-number.h"
 #include "bp-endpoint-id.h"
 #include "bp-primary-block.h"
-#include "bp-canonical-block.h
+#include "bp-canonical-block.h"
 #include "json.hpp"
 using json = nlohmann::json;
 
 namespace ns3 {
+
+void PrintVectorBuffer (std::vector <std::uint8_t> v_cbor);
+void CompareCborBytesToVector (std::vector <std::uint8_t> v_cbor1, std::vector <std::uint8_t> v_cbor2);
+void PrintCborBytes (std::vector <std::uint8_t> cborBundle);
+
+/**
+ * \brief Bundle protocol bundle header
+ * 
+ * A quick way to account for NS-3 not seperating packets in the receive buffer
+ * 
+*/
+class BpBundleHeader : public Header
+{
+public:
+  BpBundleHeader ();
+  virtual ~BpBundleHeader ();
+
+  // Setters
+  
+  /**
+   * \brief Set the size of the bundle
+   * 
+   * \param size the size of the bundle
+   */
+  void SetBundleSize (const uint32_t size);
+
+  // Getters
+
+  /**
+   * \brief Get the size of the bundle
+   * 
+  */
+  uint32_t GetBundleSize () const;
+
+  static TypeId GetTypeId (void);
+  virtual TypeId GetInstanceTypeId (void) const;
+  virtual uint32_t GetSerializedSize (void) const;
+  virtual void Serialize (Buffer::Iterator start) const;
+  virtual uint32_t Deserialize (Buffer::Iterator start);
+  virtual void Print (std::ostream &os) const;
+
+  private:
+    uint32_t m_bundleSize;          // the bundle size
+};
 
 /**
  * \brief Bundle protocol bundle
@@ -44,10 +88,13 @@ namespace ns3 {
  * The structure of the bundle protocol bundle, which is defined in section 4.3.1 of RFC 9171.
  * 
 */
-class BpBundle
+class BpBundle : public Object // SimpleRefCount<BpBundle>
 {
 public:
   BpBundle ();
+  BpBundle (uint8_t constraint, BpPrimaryBlock primaryBlock, BpCanonicalBlock payloadBlock);
+  BpBundle (std::vector <uint8_t> cborBundle);
+  BpBundle (uint8_t constraint, BpEndpointId src, BpEndpointId dst, uint32_t payloadSize, const uint8_t* payloadData);
   virtual ~BpBundle ();
 
   // Setters
@@ -89,6 +136,27 @@ public:
   // Getters
 
     /**
+     * \brief Is the bundle pending dispatch?
+     * 
+     * \return true if the bundle is pending dispatch, false otherwise
+     */
+    bool IsDispatchPending () const;
+
+    /**
+     * \brief Is the bundle pending forward?
+     * 
+     * \return true if the bundle is pending forward, false otherwise
+     */
+    bool IsForwardPending () const;
+
+    /**
+     * \brief Is the bundle pending reassembly?
+     * 
+     * \return true if the bundle is pending reassembly, false otherwise
+     */
+    bool IsReassemblyPending () const;
+
+    /**
      * \brief Get the bundle retentioin constraint
      * 
      * \return the bundle retention constraint
@@ -107,14 +175,20 @@ public:
      * 
      * \return a pointer to the bundle primary block
      */
-    BpPrimaryBlock *GetPrimaryBlockPtr ();
+    BpPrimaryBlock *GetPrimaryBlockPtr ()
+    {
+        return &m_primaryBlock;
+    }
 
     /**
      * \brief Get a pointer to the payload block
      * 
      * \return a pointer to the payload block
      */
-    BpCanonicalBlock *GetPayloadBlockPtr ();
+    BpCanonicalBlock *GetPayloadBlockPtr ()
+    {
+        return &m_payloadBlock;
+    }
 
     /**
      * \brief Get the bundle extension block
@@ -142,9 +216,32 @@ public:
      * 
      * \return the bundle CBOR encoding
      */
-    std::vector <std::uint8_t> GetCborEncoding () const;
+    std::vector <std::uint8_t> GetCborEncoding ();
+
+    /**
+     * \brief Get the size of the CBOR encoded bundle in bytes
+     * 
+     * \return the size of the CBOR encoded bundle in bytes
+     */
+    uint GetCborEncodingSize ();
+    void PrintCborBytes ();
 
     // TODO:  Add the rest of the getters
+
+    /*
+    * Inline operators
+    */
+    inline void operator << (const BpBundle &bundle) const
+    {
+        //std::stringstream ss;
+        //ss << &bundle << std::endl;
+        //ss << "Bundle: " << bundle.GetPrimaryBlockPtr ()->m_sourceEndpointId.Uri () << " -> " << bundle.GetPrimaryBlockPtr ()->m_destEndpointId.Uri () << std::endl;
+        //ss << "  Creation Timestamp: " << bundle.GetPrimaryBlockPtr ()->GetCreationTimestamp () << std::endl;
+        //ss << "  Lifetime: " << bundle.GetPrimaryBlockPtr ()->GetLifetime () << std::endl;
+        //ss << "  Payload Block Data Size: " << bundle.GetPayloadBlockPtr ()->GetBlockDataSize () << std::endl;
+        //return ss.str ();
+    }
+
 
   /*
   * Bundle constraints
@@ -156,7 +253,7 @@ public:
     } BundleRetentionConstraint;
 
 private:
-    uint8_t m_retentionConstraint;          // the version of bundle protocol
+    uint8_t m_retentionConstraint;          // the bundle retention constraint
     BpPrimaryBlock m_primaryBlock;          // primary block
     BpCanonicalBlock m_extensionBlock;      // extension block  // TODO:  change implementation to support several extension blocks
     BpCanonicalBlock m_payloadBlock;        // payload block

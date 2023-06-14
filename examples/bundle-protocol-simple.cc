@@ -39,7 +39,7 @@
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("BundleProtocolSimpleExample");
-
+/*
 void Send (Ptr<BundleProtocol> sender, uint32_t size, BpEndpointId src, BpEndpointId dst)
 {
   NS_LOG_INFO ("Send(...) called.");
@@ -48,16 +48,17 @@ void Send (Ptr<BundleProtocol> sender, uint32_t size, BpEndpointId src, BpEndpoi
   Ptr<Packet> packet = Create<Packet> (size);
   sender->Send (packet, src, dst);
 }
-
+*/
 void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, BpEndpointId dst)
 {
   NS_LOG_INFO ("Sendpacket(...) called.");
   uint32_t size = strlen(data);
   std::cout << Simulator::Now ().GetMilliSeconds () << " Send a PDU with size " << size << ", containing:" << std::endl << data << std::endl;
-  Ptr<Packet> packet = Create<Packet> (reinterpret_cast<const uint8_t*>(data), size);
-  sender->Send_packet (packet, src, dst);
+  //Ptr<Packet> packet = Create<Packet> (reinterpret_cast<const uint8_t*>(data), size);
+  //sender->Send_packet (packet, src, dst);
+  sender->Send_data (reinterpret_cast<const uint8_t*>(data), size, src, dst);
 }
-
+/*
 void Receive (Ptr<BundleProtocol> receiver, BpEndpointId eid)
 {
 
@@ -69,24 +70,27 @@ void Receive (Ptr<BundleProtocol> receiver, BpEndpointId eid)
       p = receiver->Receive (eid);
     }
 }
+*/
 
 void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
 {
 
-  Ptr<Packet> p = receiver->Receive (eid);
+  //Ptr<Packet> p = receiver->Receive (eid);
+  std::vector<uint8_t> data = receiver->Receive_data (eid);
   NS_LOG_INFO ("Receive(..) called.");
-  while (p != NULL)
+  while (!data.empty())
     {
-      uint32_t size = p->GetSize();
+      uint32_t size = data.size();
       std::cout << Simulator::Now ().GetMilliSeconds () << " Receive bundle size " << size << std::endl;
-      char* buffer = new char[p->GetSize()+1];
-      p->CopyData(reinterpret_cast<uint8_t*>(buffer), size);
+      char* buffer = new char[size+1];
+      std::copy(data.begin(), data.end(), buffer);
+      //p->CopyData(reinterpret_cast<uint8_t*>(buffer), size);
       buffer[size] = '\0'; // Null terminating char_array to ensure cout doesn't overrun when printing
       std::cout << "Data received: " << std::endl << buffer << std::endl;
 
       delete [] buffer;
       // Try to get another packet
-      p = receiver->Receive (eid);
+      data = receiver->Receive_data (eid);
     }
 }
 
@@ -131,7 +135,7 @@ main (int argc, char *argv[])
   std::ostringstream l4type;
   l4type << "Tcp";
   Config::SetDefault ("ns3::BundleProtocol::L4Type", StringValue (l4type.str ()));
-  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (400));  // -- is this saying bundles are segmented into 400 bytes?
+  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (200)); // 400));  // -- is this saying bundles are segmented into 400 bytes?
   Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (512));  // -- and packets are segmented into 512 bytes (I'm assuming assuming the 112 byte difference is tcp/bp header overhead)
 
   // build endpoint ids
@@ -184,7 +188,7 @@ main (int argc, char *argv[])
     Is this the official way to interface with BP or just a simple test?
   */
   // Sending a bundle packet of data
-  //char data[] = "Books serve to show a man that those original thoughts of his aren't very new after all.";
+  char data[] = "Books serve to show a man that those original thoughts of his aren't very new after all.";
   
   /*
   char data[] = "Mr. Chairman, this movement is exclusively the work of politicians; "
@@ -193,7 +197,7 @@ main (int argc, char *argv[])
                 "honest men. I say this with the greater freedom because, being a politician myself, "
                 "none can regard it as personal.";
   */
-  
+  /*
   char data[] = "The Senate of the United States shall be composed of two Senators from each State, "
                 "chosen by the Legislature thereof, for six Years; and each Senator shall have one Vote."
                 "Immediately after they shall be assembled in Consequence of the first Election, they shall"
@@ -217,7 +221,7 @@ main (int argc, char *argv[])
                 " from Office, and disqualification to hold and enjoy any Office of honor, Trust or Profit"
                 " under the United States: but the Party convicted shall nevertheless be liable and subject"
                 " to Indictment, Trial, Judgment and Punishment, according to Law.";
-
+  */
 
   NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);
   Simulator::Schedule (Seconds (0.2), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);  
