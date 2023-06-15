@@ -233,13 +233,7 @@ public:
     */
     inline void operator << (const BpBundle &bundle) const
     {
-        //std::stringstream ss;
-        //ss << &bundle << std::endl;
-        //ss << "Bundle: " << bundle.GetPrimaryBlockPtr ()->m_sourceEndpointId.Uri () << " -> " << bundle.GetPrimaryBlockPtr ()->m_destEndpointId.Uri () << std::endl;
-        //ss << "  Creation Timestamp: " << bundle.GetPrimaryBlockPtr ()->GetCreationTimestamp () << std::endl;
-        //ss << "  Lifetime: " << bundle.GetPrimaryBlockPtr ()->GetLifetime () << std::endl;
-        //ss << "  Payload Block Data Size: " << bundle.GetPayloadBlockPtr ()->GetBlockDataSize () << std::endl;
-        //return ss.str ();
+      
     }
 
 

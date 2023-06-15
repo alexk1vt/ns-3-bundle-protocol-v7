@@ -39,43 +39,19 @@
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("BundleProtocolSimpleExample");
-/*
-void Send (Ptr<BundleProtocol> sender, uint32_t size, BpEndpointId src, BpEndpointId dst)
-{
-  NS_LOG_INFO ("Send(...) called.");
-  std::cout << Simulator::Now ().GetMilliSeconds () << " Send a PDU with size " << size << std::endl;
 
-  Ptr<Packet> packet = Create<Packet> (size);
-  sender->Send (packet, src, dst);
-}
-*/
 void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, BpEndpointId dst)
 {
   NS_LOG_INFO ("Sendpacket(...) called.");
   uint32_t size = strlen(data);
   std::cout << Simulator::Now ().GetMilliSeconds () << " Send a PDU with size " << size << ", containing:" << std::endl << data << std::endl;
-  //Ptr<Packet> packet = Create<Packet> (reinterpret_cast<const uint8_t*>(data), size);
-  //sender->Send_packet (packet, src, dst);
+
   sender->Send_data (reinterpret_cast<const uint8_t*>(data), size, src, dst);
 }
-/*
-void Receive (Ptr<BundleProtocol> receiver, BpEndpointId eid)
-{
-
-  Ptr<Packet> p = receiver->Receive (eid);
-  NS_LOG_INFO ("Receive(..) called.");
-  while (p != NULL)
-    {
-      std::cout << Simulator::Now ().GetMilliSeconds () << " Receive bundle size " << p->GetSize () << std::endl;
-      p = receiver->Receive (eid);
-    }
-}
-*/
 
 void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
 {
 
-  //Ptr<Packet> p = receiver->Receive (eid);
   std::vector<uint8_t> data = receiver->Receive_data (eid);
   NS_LOG_INFO ("Receive(..) called.");
   while (!data.empty())
@@ -84,7 +60,6 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
       std::cout << Simulator::Now ().GetMilliSeconds () << " Receive bundle size " << size << std::endl;
       char* buffer = new char[size+1];
       std::copy(data.begin(), data.end(), buffer);
-      //p->CopyData(reinterpret_cast<uint8_t*>(buffer), size);
       buffer[size] = '\0'; // Null terminating char_array to ensure cout doesn't overrun when printing
       std::cout << "Data received: " << std::endl << buffer << std::endl;
 
@@ -188,8 +163,9 @@ main (int argc, char *argv[])
     Is this the official way to interface with BP or just a simple test?
   */
   // Sending a bundle packet of data
+  /*
   char data[] = "Books serve to show a man that those original thoughts of his aren't very new after all.";
-  
+  */
   /*
   char data[] = "Mr. Chairman, this movement is exclusively the work of politicians; "
                 "a set of men who have interests aside from the interests of the people, and who, "
@@ -197,7 +173,7 @@ main (int argc, char *argv[])
                 "honest men. I say this with the greater freedom because, being a politician myself, "
                 "none can regard it as personal.";
   */
-  /*
+  
   char data[] = "The Senate of the United States shall be composed of two Senators from each State, "
                 "chosen by the Legislature thereof, for six Years; and each Senator shall have one Vote."
                 "Immediately after they shall be assembled in Consequence of the first Election, they shall"
@@ -221,7 +197,7 @@ main (int argc, char *argv[])
                 " from Office, and disqualification to hold and enjoy any Office of honor, Trust or Profit"
                 " under the United States: but the Party convicted shall nevertheless be liable and subject"
                 " to Indictment, Trial, Judgment and Punishment, according to Law.";
-  */
+  
 
   NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);
   Simulator::Schedule (Seconds (0.2), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);  

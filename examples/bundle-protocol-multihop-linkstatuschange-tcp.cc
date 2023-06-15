@@ -40,41 +40,17 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("BundleProtocolMultihopLinkStatusChange");
 
-/*
-void Send (Ptr<BundleProtocol> sender, uint32_t size, BpEndpointId src, BpEndpointId dst)
-{
-  std::cout << Simulator::Now ().GetMilliSeconds () << " Send a PDU with size " << size << std::endl;
-
-  Ptr<Packet> packet = Create<Packet> (size);
-  sender->Send (packet, src, dst);
-}
-*/
-/*
-void Receive (Ptr<BundleProtocol> receiver, BpEndpointId eid)
-{
-
-  Ptr<Packet> p = receiver->Receive (eid);
-  while (p != NULL)
-    {
-      std::cout << Simulator::Now ().GetMilliSeconds () << " Receive bundle size " << p->GetSize () << std::endl;
-      p = receiver->Receive (eid);
-    }
-}
-*/
 void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, BpEndpointId dst)
 {
   NS_LOG_INFO ("Sendpacket(...) called.");
   uint32_t size = strlen(data);
   std::cout << Simulator::Now ().GetMilliSeconds () << " Send a PDU with size " << size << ", containing:" << std::endl << data << std::endl;
-  //Ptr<Packet> packet = Create<Packet> (reinterpret_cast<const uint8_t*>(data), size);
-  //sender->Send_packet (packet, src, dst);
   sender->Send_data (reinterpret_cast<const uint8_t*>(data), size, src, dst);
 }
 
 void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
 {
 
-  //Ptr<Packet> p = receiver->Receive (eid);
   std::vector<uint8_t> data = receiver->Receive_data (eid);
   NS_LOG_INFO ("Receive(..) called.");
   while (!data.empty())
@@ -83,7 +59,6 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
       std::cout << Simulator::Now ().GetMilliSeconds () << " Receive bundle size " << size << std::endl;
       char* buffer = new char[size+1];
       std::copy(data.begin(), data.end(), buffer);
-      //p->CopyData(reinterpret_cast<uint8_t*>(buffer), size);
       buffer[size] = '\0'; // Null terminating char_array to ensure cout doesn't overrun when printing
       std::cout << "Data received: " << std::endl << buffer << std::endl;
 
@@ -98,22 +73,6 @@ void Register (Ptr<BundleProtocol> node, BpEndpointId eid, InetSocketAddress l4A
     std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
     node->ExternalRegister (eid, 0, true, l4Address);
 }
-
-/*
-void setIfaceDown (Ptr<Ipv4> node, uint32_t i_index)
-{
-    //pv4_node1->SetDown(1)
-    std::cout << Simulator::Now ().GetMilliSeconds () << " Setting interface " << i_index << " on node " << node << " to _down_" << std::endl;
-    node->SetDown(i_index);
-}
-
-void setIfaceUp (Ptr<Ipv4> node, uint32_t i_index)
-{
-    //pv4_node1->SetDown(1)
-    std::cout << Simulator::Now ().GetMilliSeconds () << " Setting interface " << i_index << " on node " << node << " to _up_" << std::endl;
-    node->SetUp(i_index);
-}
-*/
 
 void print_Ipv4InterfaceAddress (Ptr<Ipv4Interface> iface_node)
 {
@@ -187,7 +146,7 @@ main (int argc, char *argv[])
   std::ostringstream l4type;
   l4type << "Tcp";
   Config::SetDefault ("ns3::BundleProtocol::L4Type", StringValue (l4type.str ()));
-  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (400)); 
+  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (200)); 
   Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (512));
   // modifying tcp connection timeout and retry attempts to minimize length of test
   Config::SetDefault ("ns3::TcpSocket::ConnTimeout", TimeValue (Seconds (2)));

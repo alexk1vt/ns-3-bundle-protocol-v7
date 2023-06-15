@@ -39,34 +39,12 @@
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("BundleProtocolMultihopExample");
-/*
-void Send (Ptr<BundleProtocol> sender, uint32_t size, BpEndpointId src, BpEndpointId dst)
-{
-  std::cout << Simulator::Now ().GetMilliSeconds () << " Send a PDU with size " << size << std::endl;
 
-  Ptr<Packet> packet = Create<Packet> (size);
-  sender->Send (packet, src, dst);
-}
-*/
-/*
-void Receive (Ptr<BundleProtocol> receiver, BpEndpointId eid)
-{
-
-  Ptr<Packet> p = receiver->Receive (eid);
-  while (p != NULL)
-    {
-      std::cout << Simulator::Now ().GetMilliSeconds () << " Receive bundle size " << p->GetSize () << std::endl;
-      p = receiver->Receive (eid);
-    }
-}
-*/
 void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, BpEndpointId dst)
 {
   NS_LOG_INFO ("Sendpacket(...) called.");
   uint32_t size = strlen(data);
   std::cout << Simulator::Now ().GetMilliSeconds () << " Send a PDU with size " << size << ", containing:" << std::endl << data << std::endl;
-  //Ptr<Packet> packet = Create<Packet> (reinterpret_cast<const uint8_t*>(data), size);
-  //sender->Send_packet (packet, src, dst);
   sender->Send_data (reinterpret_cast<const uint8_t*>(data), size, src, dst);
 }
 
@@ -82,7 +60,6 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
       std::cout << Simulator::Now ().GetMilliSeconds () << " Receive bundle size " << size << std::endl;
       char* buffer = new char[size+1];
       std::copy(data.begin(), data.end(), buffer);
-      //p->CopyData(reinterpret_cast<uint8_t*>(buffer), size);
       buffer[size] = '\0'; // Null terminating char_array to ensure cout doesn't overrun when printing
       std::cout << "Data received: " << std::endl << buffer << std::endl;
 
@@ -160,7 +137,7 @@ main (int argc, char *argv[])
   std::ostringstream l4type;
   l4type << "Tcp";
   Config::SetDefault ("ns3::BundleProtocol::L4Type", StringValue (l4type.str ()));
-  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (400)); 
+  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (200)); 
   Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (512));
 
   // build endpoint ids
