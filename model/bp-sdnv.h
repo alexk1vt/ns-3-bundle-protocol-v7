@@ -18,8 +18,8 @@
  * Author: Dizhi Zhou        <dizhi.zhou@gmail.com>
  *         Tommaso Pecorella <tommaso.pecorella@unifi.it>
  */
-#ifndef SDNV_H
-#define SDNV_H
+#ifndef BP_SDNV_H
+#define BP_SDNV_H
 
 #include <vector>
 #include <stdint.h>
@@ -30,21 +30,21 @@ namespace ns3 {
 /**
  * \brief an implementation class of self-delimiting numeric values based on RFC 6256
  */
-class SDNV
+class BpSdnv
 {
 public:
   /**
    * Constructor
    */
-  SDNV ();
+  BpSdnv ();
 
   /**
    * Destroy
    */
-  virtual ~SDNV ();
+  virtual ~BpSdnv ();
 
   /**
-   * \brief SDNV encoding algorithm
+   * \brief BpSdnv encoding algorithm
    *
    * The encoding algorithm is based on section 3.1, RFC 6256
    *
@@ -61,7 +61,7 @@ public:
   uint32_t EncodingLength(uint64_t val);
 
   /**
-   * \brief SDNV decoding algorithm for an integer
+   * \brief BpSdnv decoding algorithm for an integer
    *
    * The decoding algorithm is based on section 3.2, RFC 6256
    *
@@ -72,7 +72,7 @@ public:
   uint64_t Decode (std::vector<uint8_t> val);
 
   /**
-   * \brief SDNV decoding algorithm for a Buffer
+   * \brief BpSdnv decoding algorithm for a Buffer
    *
    * This method read an integer from the Buffer and decodes it by 
    * Decode (std::vector<uint8_t val>)
@@ -101,4 +101,4 @@ public:
 
 } // namespace ns3
 
-#endif /* SDNV_H */
+#endif /* BP_SDNV_H */
