@@ -71,7 +71,7 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
 void Register (Ptr<BundleProtocol> node, BpEndpointId eid, InetSocketAddress l4Address)
 {
     std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
-    node->ExternalRegister (eid, 0, true, l4Address);
+    node->ExternalRegisterTcp (eid, 0, true, l4Address);
 }
 
 void print_Ipv4InterfaceAddress (Ptr<Ipv4Interface> iface_node)

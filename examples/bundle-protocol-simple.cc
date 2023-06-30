@@ -35,6 +35,7 @@
 #include "ns3/bp-static-routing-protocol.h"
 #include "ns3/bundle-protocol-helper.h"
 #include "ns3/bundle-protocol-container.h"
+//#include "ns3/ltp-protocol.h"
 
 using namespace ns3;
 
@@ -72,7 +73,7 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
 void Register (Ptr<BundleProtocol> node, BpEndpointId eid, InetSocketAddress l4Address)
 {
     std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
-    node->ExternalRegister (eid, 0, true, l4Address);
+    node->ExternalRegisterTcp (eid, 0, true, l4Address);
 }
 
 int

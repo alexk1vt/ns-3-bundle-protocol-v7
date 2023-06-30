@@ -43,7 +43,6 @@
 #include "bp-bundle.h"
 #include "ns3/tcp-socket-factory.h"
 #include "ns3/inet-socket-address.h"
-#include "ns3/packet.h"
 
 // default port number of dtn bundle tcp convergence layer, which is 
 // defined in draft-irtf--dtnrg-tcp-clayer-0.6
@@ -375,7 +374,8 @@ BpTcpClaProtocol::EnableReceive (const BpEndpointId &local)
   Ptr<BpStaticRoutingProtocol> route = DynamicCast <BpStaticRoutingProtocol> (m_bpRouting);
   //InetSocketAddress addr = route->GetRoute (local);
   BpEndpointId next_hop = route->GetRoute (local);
-  InetSocketAddress addr = getL4Address(next_hop);
+  InetSocketAddress returnType ("127.0.0.1", 0);
+  InetSocketAddress addr = GetL4Address(next_hop, returnType);
   InetSocketAddress badAddr ("1.0.0.1", 0);
   if (addr == badAddr)
     return -1;
@@ -400,7 +400,7 @@ BpTcpClaProtocol::EnableReceive (const BpEndpointId &local)
 
   SetL4SocketCallbacks (socket);
  
-  // store the sending socket so that the convergence layer can dispatch the hundles to different tcp connections
+  // store the receiving socket so that the convergence layer can dispatch the hundles to different tcp connections
   std::map<BpEndpointId, Ptr<Socket> >::iterator it = m_l4RecvSockets.end ();
   it = m_l4RecvSockets.find (local);
   if (it == m_l4RecvSockets.end ())
@@ -442,7 +442,8 @@ BpTcpClaProtocol::EnableSend (const BpEndpointId &src, const BpEndpointId &dst)
   // check route for destination endpoint id
   Ptr<BpStaticRoutingProtocol> route = DynamicCast <BpStaticRoutingProtocol> (m_bpRouting);
   BpEndpointId next_hop = route->GetRoute (dst);
-  InetSocketAddress address = getL4Address(next_hop);
+  InetSocketAddress returnType ("127.0.0.1", 0);
+  InetSocketAddress address = GetL4Address(next_hop, returnType);
 
   InetSocketAddress defaultAddr ("127.0.0.1", 0);
   if (address == defaultAddr)
@@ -636,21 +637,29 @@ BpTcpClaProtocol::DataRecv (Ptr<Socket> socket)
 }
 
 int
-BpTcpClaProtocol::setL4Address (BpEndpointId eid, InetSocketAddress l4Address)
+BpTcpClaProtocol::SetL4Address (BpEndpointId eid, const InetSocketAddress* l4Address)
 {
-  NS_LOG_FUNCTION (this << " " << eid.Uri() << " " << l4Address.GetIpv4());
+  NS_LOG_FUNCTION (this << " " << eid.Uri() << " " << l4Address->GetIpv4());
   
   std::map<BpEndpointId, InetSocketAddress>::iterator it = m_l4Addresses.find (eid);
   if (it == m_l4Addresses.end ())
-    m_l4Addresses.insert (std::pair<BpEndpointId, InetSocketAddress>(eid, l4Address));  
+    m_l4Addresses.insert (std::pair<BpEndpointId, InetSocketAddress>(eid, *l4Address));  
   else
     return -1;
   
   return 0;
 }
+/*
+int
+BpTcpClaProtocol::setL4AddressLtp (BpEndpointId eid, uint64_t l4Address)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri () << " " << l4address);
 
+  return -1;
+}
+*/
 InetSocketAddress
-BpTcpClaProtocol::getL4Address (BpEndpointId eid)
+BpTcpClaProtocol::GetL4Address (BpEndpointId eid, InetSocketAddress returnType)
 {
   NS_LOG_FUNCTION (this << " " << eid.Uri());
 
@@ -662,6 +671,68 @@ BpTcpClaProtocol::getL4Address (BpEndpointId eid)
   }
   else
     return ((*it).second); 
+}
+/*
+uint64_t
+BpTcpClaProtocol::getL4AddressLtp (BpEndpointId eid)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri());
+
+  InetSocketAddress badAddr ("1.0.0.1", 0);
+  return badAddr;
+}
+*/
+/*
+void*
+BpTcpClaProtocol::getL4Address (BpEndpointId eid)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri());
+
+  InetSocketAddress l4SocketAddress = getL4AddressTcp (eid);
+  return reinterpret_cast<void*>(&l4SocketAddress);
+  //return reinterpret_cast<void*>(l4SocketAddress.GetLocal().GetPtr());
+}
+*/
+/*
+int
+BpTcpClaProtocol::setL4AddressGeneric (BpEndpointId eid, unsigned char &l4Address)
+{
+  InetSocketAddress l4SocketAddress = reinterpret_cast<InetSocketAddress>(l4Address);
+  NS_LOG_FUNCTION (this << " " << eid.Uri() << " " << l4Address.GetIpv4());
+  
+  std::map<BpEndpointId, InetSocketAddress>::iterator it = m_l4Addresses.find (eid);
+  if (it == m_l4Addresses.end ())
+    m_l4Addresses.insert (std::pair<BpEndpointId, InetSocketAddress>(eid, l4Address));  
+  else
+    return -1;
+  
+  return 0;
+}
+*/
+
+/*
+unsigned char
+BpTcpClaProtocol::getL4AddressGeneric (BpEndpointId eid)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri());
+
+  std::map<BpEndpointId, InetSocketAddress>::iterator it = m_l4Addresses.find (eid);
+  if (it == m_l4Addresses.end ())
+  {
+    InetSocketAddress badAddr ("1.0.0.1", 0);
+    unsigned char badAddrGeneric = reinterpret_cast<unsigned char>(badAddr);
+    return badAddr;
+  }
+  else
+    unsigned char addressGeneric = reinterpret_cast<unsigned char>((*it).second);
+    return addressGeneric;
+}
+*/
+
+void
+BpTcpClaProtocol::SetL4Protocol (std::string l4Type)
+{
+  NS_LOG_FUNCTION (this << " " << l4Type);
 }
 
 void 

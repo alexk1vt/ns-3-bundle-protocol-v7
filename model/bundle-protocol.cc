@@ -30,6 +30,7 @@
 #include "ns3/string.h"
 #include "ns3/buffer.h"
 #include "bp-tcp-cla-protocol.h"
+#include "bp-ltp-cla-protocol.h"
 #include "bundle-protocol.h"
 //#include "bp-header.h"
 //#include "bp-payload-header.h"
@@ -102,6 +103,18 @@ BundleProtocol::Open (Ptr<Node> node)
       m_cla = cla;
       m_cla->SetBundleProtocol (this);
     }
+  else if (m_l4Type == "Ltp")
+    {
+      Ptr<BpLtpClaProtocol> cla = CreateObject<BpLtpClaProtocol>();
+      m_cla = cla;
+      m_cla->SetBundleProtocol (this);
+      //m_cla->SetL4Protocol (static_cast<void*>(m_node->GetObject<ns3::ltp::LtpProtocol>()), m_node->GetObject<ns3::ltp::LtpProtocol>()->GetLocalEngineId ()); // LTP requires pointer to the protocol to operate
+      //ns3::Ptr<ns3::ltp::LtpProtocol> protocol = m_node->GetObject<ns3::ltp::LtpProtocol>();
+      //uint64_t engineId = protocol->GetLocalEngineId ();
+      //m_cla->SetL4Protocol (m_node->GetObject<ns3::ltp::LtpProtocol>(), m_node->GetObject<ns3::ltp::LtpProtocol>()->GetLocalEngineId ()); 
+      //m_cla->SetL4Protocol (protocol, engineId);//, true);
+      m_cla->SetL4Protocol (m_l4Type);
+    }
   else
     {
       NS_FATAL_ERROR ("BundleProtocol::Open (): unknown tranport layer protocol type! " << m_l4Type);   
@@ -139,9 +152,42 @@ BundleProtocol::SetBpEndpointId (BpEndpointId eid)
 }
 
 int
-BundleProtocol::ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state, const InetSocketAddress l4Address)
+BundleProtocol::ExternalRegisterTcp (const BpEndpointId &eid, const double lifetime, const bool state, const InetSocketAddress l4Address)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri () << " Tcp");
+  BpRegisterInfo info;
+  info.lifetime = lifetime;
+  info.state = state;
+  info.cla = m_cla;
+  int retval = m_cla->SetL4Address (eid, &l4Address);
+  if (retval < 0)
+  {
+    return -1;
+  }
+  return Register (eid, info);
+}
+
+int
+BundleProtocol::ExternalRegisterLtp (const BpEndpointId &eid, const double lifetime, const bool state, const uint64_t l4Address)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri () << " Ltp");
+  BpRegisterInfo info;
+  info.lifetime = lifetime;
+  info.state = state;
+  info.cla = m_cla;
+  int retval = m_cla->SetL4Address (eid, reinterpret_cast<const InetSocketAddress*>(&l4Address));
+  if (retval < 0)
+  {
+    return -1;
+  }
+  return Register (eid, info);
+}
+/*
+int
+BundleProtocol::ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state, void* l4Address)
 {
   NS_LOG_FUNCTION (this << " " << eid.Uri ());
+
   BpRegisterInfo info;
   info.lifetime = lifetime;
   info.state = state;
@@ -153,7 +199,7 @@ BundleProtocol::ExternalRegister (const BpEndpointId &eid, const double lifetime
   }
   return Register (eid, info);
 }
-
+*/
 int 
 BundleProtocol::Register (const BpEndpointId &eid, const struct BpRegisterInfo &info)
 { 
@@ -182,7 +228,6 @@ BundleProtocol::Register (const BpEndpointId &eid, const struct BpRegisterInfo &
       NS_FATAL_ERROR ("BundleProtocol::Register (): duplicate registration with endpoint id ");
       return -1;
     }
-
 }
 
 int 
@@ -625,7 +670,6 @@ BundleProtocol::Receive (const BpEndpointId &eid)
           return emptyBundle;
         }
     }
-
 }
 
 BpEndpointId 
@@ -634,7 +678,6 @@ BundleProtocol::GetBpEndpointId () const
   NS_LOG_FUNCTION (this);
   return m_eid;
 }
-
 
 void
 BundleProtocol::SetRoutingProtocol (Ptr<BpRoutingProtocol> route)

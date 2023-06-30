@@ -7,10 +7,11 @@
 #     conf.check_nonfatal(header_name='stdint.h', define_name='HAVE_STDINT_H')
 
 def build(bld):
-    module = bld.create_ns3_module('bundle-protocol', ['core', 'network','internet'])
+    module = bld.create_ns3_module('bundle-protocol', ['core', 'network','internet', 'ltp-protocol'])
     module.source = [
         'model/bp-cla-protocol.cc',
         'model/bp-tcp-cla-protocol.cc',
+        'model/bp-ltp-cla-protocol.cc',
         'model/bp-endpoint-id.cc',
         'model/bp-header.cc',
         'model/bp-payload-header.cc',
@@ -24,7 +25,7 @@ def build(bld):
         'helper/bundle-protocol-helper.cc',
         'helper/bundle-protocol-container.cc',
         ]
-
+    #module.lib=['ltp-protocol']
     module_test = bld.create_ns3_module_test_library('bundle-protocol')
     module_test.source = [
         'test/bundle-protocol-test-suite.cc',
@@ -35,6 +36,7 @@ def build(bld):
     headers.source = [
         'model/bp-cla-protocol.h',
         'model/bp-tcp-cla-protocol.h',
+        'model/bp-ltp-cla-protocol.h',
         'model/bp-endpoint-id.h',
         'model/bp-header.h',
         'model/bp-payload-header.h',
@@ -47,7 +49,7 @@ def build(bld):
         'model/bp-primary-block.h',
         'model/json.hpp',
         'helper/bundle-protocol-helper.h',
-        'helper/bundle-protocol-container.h',
+        'helper/bundle-protocol-container.h'
         ]
 
     if bld.env.ENABLE_EXAMPLES:

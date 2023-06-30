@@ -227,5 +227,5 @@ void
 BundleProtocolTestCase::Register (Ptr<BundleProtocol> node, BpEndpointId eid, InetSocketAddress l4Address)
 {
     std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
-    node->ExternalRegister (eid, 0, true, l4Address);
+    node->ExternalRegisterTcp (eid, 0, true, l4Address);
 }
