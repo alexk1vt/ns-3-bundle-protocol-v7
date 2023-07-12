@@ -87,6 +87,7 @@ BpLtpClaProtocol::SendBundle (Ptr<BpBundle> bundlePtr)
         //bundleHeader.SetBundleSize (cborSize);
         //packet->AddHeader (bundleHeader);
         std::vector <std::uint8_t> cborEncoding = bundle->GetCborEncoding ();
+        NS_LOG_FUNCTION (this << "cborEncoding.size() = " << cborEncoding.size() << " cborEncoding.capacity() = " << cborEncoding.capacity() << " cborSize = " << cborSize);
         uint64_t ClientServiceId = 1; // 1 - bundle protocol
         uint64_t returnType;
         uint64_t destEngineId = GetL4Address (dst, returnType);
@@ -98,7 +99,26 @@ BpLtpClaProtocol::SendBundle (Ptr<BpBundle> bundlePtr)
         uint64_t redSize = cborSize; // set entire bundle as red part for now
         NS_LOG_FUNCTION (this << " Sending packet sent from eid: " << src.Uri () << " to eid: " << dst.Uri () << " immediately");
         //m_ltp -> StartTransmission (ClientServiceId, ClientServiceId, destEngineId, reinterpret_cast<const uint8_t*>(packet), redSize);
-        m_ltp -> StartTransmission (ClientServiceId, ClientServiceId, destEngineId, cborEncoding, redSize);
+        m_ltp -> StartTransmission (ClientServiceId, ClientServiceId, destEngineId, cborEncoding, 0);
+        
+        // store bundle pointer in Tx Session Map for later updating and tracking
+        TxMapVals txMapVals;
+        txMapVals.dstEid = dst;
+        txMapVals.srcEid = src;
+        txMapVals.srcLtpEngineId = m_LtpEngineId;
+        txMapVals.dstLtpEngineId = destEngineId;
+        txMapVals.set = false;
+        std::map<Ptr<BpBundle>, TxMapVals>::iterator it = m_txSessionMap.find (bundle);
+        if (it == m_txSessionMap.end ())
+        {
+            m_txSessionMap.insert (std::pair<Ptr<BpBundle>, TxMapVals>(bundle, txMapVals));
+        }
+        else
+        {
+            NS_LOG_FUNCTION (this << " Unable to insert bundle into txSessionMap");
+            return -1;
+        }
+        return 0;
     }
     NS_LOG_FUNCTION (this << " Unable to get bundle for eid: " << src.Uri ());
     return -1;
@@ -301,9 +321,16 @@ BpLtpClaProtocol::SetSendCallback (void)
 }
 */
 void
-BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id, ns3::ltp::StatusNotificationCode code, std::vector<uint8_t> data, uint32_t dataLength, bool endFlag, uint64_t srcLtpEngine, uint32_t offset)
+BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
+                                        ns3::ltp::StatusNotificationCode code,
+                                        std::vector<uint8_t> data,
+                                        uint32_t dataLength,
+                                        bool endFlag,
+                                        uint64_t srcLtpEngine,
+                                        uint32_t offset)
 {
-    NS_LOG_FUNCTION (this << id << code << data << dataLength << endFlag << srcLtpEngine << offset);
+    //NS_LOG_FUNCTION (this << " NotificationCallback called with arguments: " << id << code << dataLength << endFlag << srcLtpEngine << offset);
+    NS_LOG_FUNCTION (this << "Internal Engine ID " << m_LtpEngineId << " received NotificationCallback:");
     // Implement this
     // This will be called when data is received, a transmission status is updated, or when a session is closed
     // Need to check if the data is a bundle or a status update
@@ -315,25 +342,165 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id, ns3::ltp::Status
     //   TX_SESSION_CANCEL
     //   RX_SESSION_CANCEL
     //   SESSION_END
-    if (code == ns3::ltp::SESSION_START) // Trying to see what information is recieved to identify whether this is a new session from a transmissiion start or an incoming session
+    if (code == ns3::ltp::SESSION_START) // Sender receives noficiation that session has started
     {
-        NS_LOG_INFO (this << " LTP Session Started. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id << " Source LTP Engine ID: " << srcLtpEngine);
+        NS_LOG_FUNCTION (this << " LTP Session Started. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id.GetSessionNumber () << " Source LTP Engine ID: " << srcLtpEngine);
+        //NS_LOG_FUNCTION (this << " Sender received notification that session " << id.GetSessionNumber () << " has started.  Record session information for later reference.");
+        // Queue to generate new session for tracking.  What info should I keep?
+        // Will need to iterate through m_txSessionMap, looking for an entry without a SessionId with a matching srcLtpEngineId
+        // If no entry is found, error
+        std::map<Ptr<BpBundle>, TxMapVals>::iterator it;
+        for (it = m_txSessionMap.begin (); it != m_txSessionMap.end (); it++)
+        {
+            if (it->second.srcLtpEngineId == srcLtpEngine && it->second.set == false)
+            {
+                it->second.sessionId = id;
+                it->second.status = code;
+                it->second.set = true; // indicate this is an entry with a matching SessionId
+                break;
+            }
+        }
+        if (it == m_txSessionMap.end ())
+        {
+            NS_LOG_ERROR ("No entry found in m_txSessionMap for srcLtpEngineId " << srcLtpEngine);
+        }
     }
     else if (code == ns3::ltp::GP_SEGMENT_RCV)
     {
-        NS_LOG_INFO (this << " Green Segment Received. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id << " Source LTP Engine ID: " << srcLtpEngine << " Data offset: " << offset << " Segment Length: " << dataLength << " End Flag: " << endFlag);
+        //NS_LOG_FUNCTION (this << " Green Segment Received. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id.GetSessionNumber () << " Source LTP Engine ID: " << srcLtpEngine << " Data offset: " << offset << " Segment Length: " << dataLength << " End Flag: " << endFlag);
+        NS_LOG_FUNCTION (this << " Receiver is informed that a Green Segment has been received.  This may be the first transmission for a new session.  Session Id is " << id.GetSessionNumber () << ".  Data offset is " << offset << ".  Segment length is " << dataLength << ".  Is this the last transmission? End flag is " << endFlag);
+        std::map<ns3::ltp::SessionId, RcvMapVals>::iterator it = m_rcvSessionMap.find (id);
+        if (it == m_rcvSessionMap.end ())
+        {
+            NS_LOG_FUNCTION (this << "First Green Part entry for SessionId " << id.GetSessionNumber ());
+            RcvMapVals temp;
+            temp.srcLtpEngineId = srcLtpEngine;
+            temp.status = code;
+            temp.greenData.resize(dataLength + offset);
+            std::copy(data.begin(), data.end(), temp.greenData.begin() + offset); // I'm assuming first green data received could have an offset
+            temp.rcvGreenDataLength = dataLength;
+            NS_LOG_FUNCTION (this << "temp.greenData.size() = " << temp.greenData.size() << " / temp.rcvGreenDataLength = " << temp.rcvGreenDataLength);
+            temp.rcvRedDataLength = 0;  // indicate no red data received yet
+            m_rcvSessionMap.insert(std::pair<ns3::ltp::SessionId, RcvMapVals>(id, temp));
+        }
+        else // Have received previous green segments for this session
+        {
+            NS_LOG_FUNCTION (this << "Found previous Green Parts Received for SessionId " << id.GetSessionNumber () );
+            it->second.status = code;
+            if (it->second.greenData.size() < it->second.rcvGreenDataLength + dataLength)
+            {
+                it->second.greenData.resize(it->second.greenData.size() + dataLength);
+            }
+            std::copy(data.begin(), data.end(), it->second.greenData.begin() + offset); // I'm assuming first green data received could have an offset
+            it->second.rcvGreenDataLength += dataLength;
+            it->second.status = code;
+        }
     }
     else if (code == ns3::ltp::RED_PART_RCV)
     {
-        NS_LOG_INFO (this << " Red Part Received. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id << " Source LTP Engine ID: " << srcLtpEngine << " Segment Length: " << dataLength << " End Flag: " << endFlag);
+        //NS_LOG_FUNCTION (this << " Red Part Received. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id.GetSessionNumber () << " Source LTP Engine ID: " << srcLtpEngine << " Segment Length: " << dataLength << " End Flag: " << endFlag);
+        NS_LOG_FUNCTION (this << " Red Part Received. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id.GetSessionNumber () << " Received << " << dataLength << " bytes");// << " Source LTP Engine ID: " << srcLtpEngine << " Segment Length: " << dataLength << " End Flag: " << endFlag);
+        std::map<ns3::ltp::SessionId, RcvMapVals>::iterator it = m_rcvSessionMap.find (id);
+        if (it == m_rcvSessionMap.end ())
+        {
+            NS_LOG_FUNCTION (this << "First Red Part entry for SessionId " << id.GetSessionNumber ());
+            RcvMapVals temp;
+            temp.srcLtpEngineId = srcLtpEngine;
+            temp.status = code;
+            temp.redData.resize(dataLength);
+            std::copy(data.begin(), data.end(), temp.redData.begin());
+            temp.rcvRedDataLength = dataLength;
+            temp.rcvGreenDataLength = 0;  // indicate no green data received yet
+            m_rcvSessionMap.insert(std::pair<ns3::ltp::SessionId, RcvMapVals>(id, temp));
+        }
+        else // Have received previous red parts for this session
+        {
+            NS_LOG_FUNCTION (this << "Found previous Red Parts Received for SessionId " << id.GetSessionNumber () << "- Should not happen!");
+        }
     }
     else if (code == ns3::ltp::SESSION_END)
     {
-        NS_LOG_INFO (this << " Session Ended. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id << " Source LTP Engine ID: " << srcLtpEngine);
+        NS_LOG_FUNCTION (this << " Session Ended. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id.GetSessionNumber () << " Source LTP Engine ID: " << srcLtpEngine);
+        
+        if (srcLtpEngine == m_LtpEngineId) // indicating the end of a transmission
+        {
+            std::map<Ptr<BpBundle>, TxMapVals>::iterator it;
+            for (it = m_txSessionMap.begin (); it != m_txSessionMap.end (); it++)
+            {
+                if (it->second.set && it->second.sessionId == id)
+                {
+                    it->second.status = code;  // I believe this indicates the session is fully completed - when should this entry be cleared out?
+                    break;
+                }
+            }
+        }
+        else // indicating the end of a reception
+        {
+            NS_LOG_FUNCTION (this << "Receiver with engineID " << m_LtpEngineId << " informed SessionId " << id.GetSessionNumber () << " is complete");
+            std::map<ns3::ltp::SessionId, RcvMapVals>::iterator it = m_rcvSessionMap.find (id);
+            if (it == m_rcvSessionMap.end ())
+            {
+                NS_LOG_FUNCTION (this << "Receiver with engineID " << m_LtpEngineId << " does not have " << id.GetSessionNumber () << " in m_rxSessionMap");
+            }
+            else
+            {
+                NS_LOG_FUNCTION (this << "SessionId " << id.GetSessionNumber () << " found in m_rxSessionMap");
+                if (it->second.rcvRedDataLength == 0 && it->second.rcvGreenDataLength == 0)
+                {
+                    NS_LOG_DEBUG (this << "No Data Received for SessionId " << id.GetSessionNumber ());
+                    return;
+                }
+                // Assemble the bundle and send up to bundle protocol
+                std::vector <uint8_t> assembledData;
+                if (it->second.rcvRedDataLength > 0)
+                {
+                    NS_LOG_FUNCTION (this << "Red Data Received for SessionId " << id.GetSessionNumber () << " with length " << it->second.redData.size() << " bytes (declared size of " << it->second.rcvRedDataLength << " bytes)");
+                    // Assemble the bundle and send up to bundle protoco
+                    assembledData.resize (it->second.rcvRedDataLength);
+                    std::copy(it->second.redData.begin(), it->second.redData.end(), assembledData.begin());
+                }
+                if (it->second.rcvGreenDataLength > 0)
+                {
+                    NS_LOG_FUNCTION (this << "Green Data Received for SessionId " << id.GetSessionNumber () << " with length " << it->second.greenData.size() << " bytes (declared size of " << it->second.rcvGreenDataLength << " bytes)");
+                    // Assemble the bundle and send up to bundle protocol
+                    //std::vector <uint8_t> assembledData;
+                    assembledData.resize (assembledData.size() + it->second.rcvGreenDataLength);
+                    std::copy(it->second.greenData.begin(), it->second.greenData.end(), assembledData.begin() + it->second.rcvRedDataLength);
+                }
+                if (assembledData.size() == 0)
+                {
+                    NS_LOG_DEBUG (this << " No Data Received for SessionId " << id.GetSessionNumber () << ". Erasing session from m_rxSessionMap and returning");
+                    m_rcvSessionMap.erase(it);
+                    return;
+                }
+                NS_LOG_FUNCTION (this << " Receiver with engineID " << m_LtpEngineId << " sending CBOR bundle with" << assembledData.size() << " bytes to bundle protocol");
+                m_bp->ReceiveCborVector (assembledData);
+                m_rcvSessionMap.erase(it);
+            }
+        }
+        
     }
     else if (code == ns3::ltp::TX_COMPLETED)
     {
-        NS_LOG_INFO (this << " Initial Session Transmission Completed.  Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id << " Source LTP Engine ID: " << srcLtpEngine);
+        NS_LOG_FUNCTION (this << " Initial Session Transmission Completed.  Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id.GetSessionNumber () << " Source LTP Engine ID: " << srcLtpEngine);
+        
+        if (srcLtpEngine == m_LtpEngineId) // Indicates the end of a transmission
+        { 
+            std::map<Ptr<BpBundle>, TxMapVals>::iterator it;
+            for (it = m_txSessionMap.begin (); it != m_txSessionMap.end (); it++)
+            {
+                if (it->second.set && it->second.sessionId == id)
+                {
+                    it->second.status = code;  // NOTE: This only means initial Tx is complete - re-TX may stil occur as needed
+                    break;
+                }
+            }
+        }
+        else // Indicates the end of a receipt
+        {
+            return;
+        }
+
     }
     
 }

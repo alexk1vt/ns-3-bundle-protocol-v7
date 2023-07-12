@@ -99,6 +99,25 @@ private:
 
     void NotificationCallback (ns3::ltp::SessionId id, ns3::ltp::StatusNotificationCode code, std::vector<uint8_t> data, uint32_t dataLength, bool endFlag, uint64_t srcLtpEngine, uint32_t offset);
 
+    struct TxMapVals {
+        ns3::ltp::SessionId sessionId;
+        ns3::ltp::StatusNotificationCode status;
+        BpEndpointId dstEid;
+        BpEndpointId srcEid;
+        uint64_t srcLtpEngineId;
+        uint64_t dstLtpEngineId;
+        bool set;
+    };
+
+    struct RcvMapVals {
+        uint64_t srcLtpEngineId;
+        ns3::ltp::StatusNotificationCode status;
+        std::vector<uint8_t> redData;
+        std::vector<uint8_t> greenData;
+        uint32_t rcvRedDataLength;
+        uint32_t rcvGreenDataLength;
+    };
+
     Ptr<BundleProtocol> m_bp;                                   // bundle protocol
     Ptr<BpRoutingProtocol> m_routing;                           // bundle routing protocol
     std::map<BpEndpointId, uint64_t> m_endpointIdToLtpEngineId; // map endpoint ID to LTP engine ID
@@ -107,6 +126,9 @@ private:
     ns3::Ptr<ns3::ltp::LtpProtocol> m_ltp;                                    // LTP protocol
     Ptr<BpRoutingProtocol> m_bpRouting;                   /// bundle routing protocol
 
+    
+    std::map<Ptr<BpBundle>, TxMapVals> m_txSessionMap;            // Map of ongoing Tx sessions
+    std::map<ns3::ltp::SessionId, RcvMapVals> m_rcvSessionMap;     // Map of ongoing Rx sessions  
 };
 
 } // namespace ns3

@@ -284,6 +284,15 @@ public:
    */
   void ReceivePacket (Ptr<Packet> packet);
 
+
+  /**
+   * Receive bundle from the convergence layer and store 
+   * the bundle into storage
+   * 
+   * \param v_bundle vector of bytes received from the transport layer
+  */
+  void ReceiveCborVector (std::vector <uint8_t> v_bundle);
+
   /**
    * Get and delete a bundle from the persistant storage
    *
@@ -415,13 +424,13 @@ private:
 
   Ptr<Packet> m_bpRxBufferPacket; /// a buffer for all packets received from the CLA; bundles are retreived from this buffer
   //Ptr<BpBundle> m_bpRxBufferPacket; /// a buffer for all packets received from the CLA; bundles are retreived from this buffer
+  std::queue<std::vector <uint8_t> > m_bpRxCborVectorQueue; /// a queue for all CBOR bundles received from the CLA; bundles are retreived from this queue
 
   SequenceNumber32 m_seq;         /// the bundle sequence number
 
   BpEndpointId m_eid;             /// unique id for endpoint id
   BpRegisterInfo m_bpRegInfo;     /// register information
   Ptr<BpRoutingProtocol> m_bpRoutingProtocol; /// bundle routing protocol
-
   Time m_startTime;         /// The simulation time that the bundle protocol will start
   Time m_stopTime;          /// The simulation time that the bundle protocol will end
   EventId m_startEvent;     /// The event that will fire at m_startTime to start the bundle protocol

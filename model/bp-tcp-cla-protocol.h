@@ -228,6 +228,7 @@ private:
   virtual void RetrySocketConn (Ptr<BpBundle> packet);
 
 private:
+
   Ptr<BundleProtocol> m_bp;                             /// bundle protocol
   std::map<BpEndpointId, Ptr<Socket> > m_l4SendSockets; /// the transport layer sender sockets
   std::map<BpEndpointId, Ptr<Socket> > m_l4RecvSockets; /// the transport layer receiver sockets

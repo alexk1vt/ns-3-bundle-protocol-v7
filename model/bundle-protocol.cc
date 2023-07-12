@@ -415,7 +415,7 @@ void
 BundleProtocol::RetreiveBundle ()
 { 
   NS_LOG_FUNCTION (this);
-
+  /*
   uint32_t size = m_bpRxBufferPacket->GetSize ();
   NS_LOG_FUNCTION (this << " Received packet of size: " << size);
   int size_check = 180;
@@ -439,6 +439,7 @@ BundleProtocol::RetreiveBundle ()
 
       // convert bundle from CBOR to JSON and continue to process
       Ptr<BpBundle> bundle = Create<BpBundle> ();
+      
       bundle->SetBundleFromCbor (v_buffer);
 
       m_bpRxBufferPacket->RemoveAtStart (cborBundleSize);
@@ -450,6 +451,16 @@ BundleProtocol::RetreiveBundle ()
     {
       NS_LOG_DEBUG (this << " Retrieved packet size is: " << std::to_string(m_bpRxBufferPacket->GetSize ()) << "; less than " << std::to_string(size_check) << ". Skipping and waiting for additional data.");
     }
+    */
+   if (!m_bpRxCborVectorQueue.empty ())
+   {
+      Ptr<BpBundle> bundle = Create<BpBundle> ();
+      std::vector <uint8_t> v_buffer = m_bpRxCborVectorQueue.front ();
+      m_bpRxCborVectorQueue.pop ();
+      bundle->SetBundleFromCbor (v_buffer);
+      ProcessBundle (bundle); // now process the bundle and perform follow-on actions
+      Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this); // see if there are any additional bundles to process
+   }
 }
 
 void 
@@ -459,7 +470,38 @@ BundleProtocol::ReceivePacket (Ptr<Packet> packet)
   // add packets into receive buffer
   m_bpRxBufferPacket->AddAtEnd (packet);
 
+  uint32_t packetSize = m_bpRxBufferPacket->GetSize ();
+  NS_LOG_FUNCTION (this << " Received packet of size: " << packetSize);
+  int size_check = 180;
+  if (packetSize > size_check) // keep checking RxBufferPacket for possible bundles
+  {  
+    BpBundleHeader bundleHeader;
+    m_bpRxBufferPacket->PeekHeader (bundleHeader);
+    uint32_t declaredCborBundleSize = bundleHeader.GetBundleSize();
+    if (packetSize < declaredCborBundleSize)
+    {
+      // the bundle is not complete
+      NS_LOG_FUNCTION (this << " Retrieved packet size is smaller than declared size.  Will not process and wait for further transmissions.");
+      return;
+    }
+    NS_LOG_FUNCTION (this << " Recieved bundle of size: " << declaredCborBundleSize);
+    m_bpRxBufferPacket->RemoveHeader (bundleHeader);
+    uint8_t buffer[declaredCborBundleSize];
+    m_bpRxBufferPacket->CopyData (&buffer[0], declaredCborBundleSize);
+    std::vector <uint8_t> v_buffer (buffer, buffer + declaredCborBundleSize);
+    m_bpRxCborVectorQueue.push (v_buffer);
+    m_bpRxBufferPacket->RemoveAtStart (declaredCborBundleSize);
     Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this);
+    //uint32_t packetSize = m_bpRxBufferPacket->GetSize ();
+  }
+}
+
+void
+BundleProtocol::ReceiveCborVector (std::vector <uint8_t> v_bundle)
+{ 
+  NS_LOG_FUNCTION (this << " Received vector of " << v_bundle.size () << " bytes");
+  m_bpRxCborVectorQueue.push (v_bundle);
+  Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this);
 }
 
 void 

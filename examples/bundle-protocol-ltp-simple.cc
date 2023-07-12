@@ -100,6 +100,8 @@ main (int argc, char *argv[])
 
   NS_LOG_INFO ("Create channels.");
 
+  //TimeValue channelDelay = TimeValue(StringValue ("5ms"));
+
   PointToPointHelper pointToPoint;
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("500Kbps"));
   pointToPoint.SetChannelAttribute ("Delay", StringValue ("5ms"));
@@ -127,13 +129,12 @@ main (int argc, char *argv[])
   Ptr<ns3::ltp::LtpIpResolutionTable> routing =  CreateObjectWithAttributes<ns3::ltp::LtpIpResolutionTable> ("Addressing", StringValue ("Ipv4"));
 
   // Use a helper to create and install Ltp Protocol instances in the nodes.
-  TimeValue channelDelay = TimeValue (Seconds (1));  // -- this is the one-way light time of the channel
-
+  
   ns3::ltp::LtpProtocolHelper ltpHelper;
   ltpHelper.SetAttributes ("CheckPointRtxLimit",  UintegerValue (20),
                            "ReportSegmentRtxLimit", UintegerValue (20),
                            "RetransCyclelimit",  UintegerValue (20),
-                           "OneWayLightTime", channelDelay);
+                           "OneWayLightTime", StringValue ("5ms"));
   ltpHelper.SetLtpIpResolutionTable (routing);
   ltpHelper.SetBaseLtpEngineId (0);
   //ltpHelper.SetStartTransmissionTime (Seconds (1));
