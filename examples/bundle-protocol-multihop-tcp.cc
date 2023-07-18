@@ -104,9 +104,11 @@ main (int argc, char *argv[])
   internet.SetRoutingHelper(routingList);
   internet.Install (nodes);
 
+  std::ostringstream channelDelay;
+  channelDelay << "5ms";
   PointToPointHelper pointToPoint;
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("500Kbps"));
-  pointToPoint.SetChannelAttribute ("Delay", StringValue ("5ms"));
+  pointToPoint.SetChannelAttribute ("Delay", StringValue (channelDelay.str ()));
 
   NetDeviceContainer link1_devices, link2_devices;
   link1_devices = pointToPoint.Install (link1_nodes);

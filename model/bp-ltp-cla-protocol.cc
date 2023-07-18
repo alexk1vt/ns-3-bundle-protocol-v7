@@ -56,6 +56,15 @@ BpLtpClaProtocol::BpLtpClaProtocol ()
 BpLtpClaProtocol::~BpLtpClaProtocol ()
 {
     NS_LOG_FUNCTION (this);
+
+    m_bp = 0;
+    m_routing = 0;
+    m_ltp = 0;
+    m_bpRouting = 0;
+
+    m_endpointIdToLtpEngineId.clear ();
+    m_txSessionMap.clear ();
+    m_rcvSessionMap.clear ();
 }
 
 void
@@ -94,7 +103,9 @@ BpLtpClaProtocol::SendBundle (Ptr<BpBundle> bundlePtr)
             NS_LOG_FUNCTION (this << " Unable to get L4 address for eid: " << nextHopEid.Uri ());
             return -1;
         }
-        uint64_t redSize = 0; //cborSize; // set entire bundle as red part for now
+        
+        //uint64_t redSize = bundle->GetCborEncodingSize ();  // set entire bundle as red part for now
+        uint64_t redSize = 0;
         
         // store bundle pointer in Tx Session Map for later updating and tracking _prior_ to sending
         TxMapVals txMapVals;
@@ -158,7 +169,8 @@ BpLtpClaProtocol::StartTransmission (Ptr<BpBundle> bundle, BpEndpointId nextHopE
     NS_LOG_FUNCTION (this << " bundle: " << bundle << " nextHopEid: " << nextHopEid.Uri () << " nextHopEngineId: " << nextHopEngineId << " redSize: " << redSize);
     BpEndpointId internalEid = m_bp->GetBpEndpointId ();
     uint32_t cborSize = bundle->GetCborEncodingSize ();
-    std::vector <std::uint8_t> cborEncoding = bundle->GetCborEncoding ();
+    std::vector <uint8_t> cborEncoding = bundle->GetCborEncoding ();
+    //std::vector <uint8_t> cborEncoding (cborSize, 65); // Red segment works for a vector of just '65s' but not for a vector of actual data...
     
     uint64_t ClientServiceId = 1; // 1 - bundle protocol
 
@@ -370,7 +382,7 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
                                         uint32_t offset)
 {
     //NS_LOG_FUNCTION (this << " NotificationCallback called with arguments: " << id << code << dataLength << endFlag << srcLtpEngine << offset);
-    NS_LOG_FUNCTION (this << "Internal Engine ID " << m_LtpEngineId << " received NotificationCallback:");
+    NS_LOG_FUNCTION (this << " Internal Engine ID " << m_LtpEngineId << " received NotificationCallback:");
     // Implement this
     // This will be called when data is received, a transmission status is updated, or when a session is closed
     // Need to check if the data is a bundle or a status update
@@ -484,7 +496,7 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
         std::map<ns3::ltp::SessionId, RcvMapVals>::iterator RcvIt = m_rcvSessionMap.find (id);
         if (RcvIt == m_rcvSessionMap.end ())
         {
-            NS_LOG_FUNCTION (this << "Receiver with engineID " << m_LtpEngineId << " does not have " << id.GetSessionNumber () << " in m_rxSessionMap");
+            NS_LOG_DEBUG (this << "Receiver with engineID " << m_LtpEngineId << " does not have " << id.GetSessionNumber () << " in m_rxSessionMap");
         }
         else
         {

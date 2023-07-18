@@ -107,9 +107,11 @@ main (int argc, char *argv[])
   internet.SetRoutingHelper(routingList);
   internet.Install (nodes);
 
+  std::ostringstream channelDelay;
+  channelDelay << "20ms";
   PointToPointHelper pointToPoint;
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("500Kbps"));
-  pointToPoint.SetChannelAttribute ("Delay", StringValue ("5ms"));
+  pointToPoint.SetChannelAttribute ("Delay", StringValue (channelDelay.str ()));
 
   NetDeviceContainer link1_devices, link2_devices;
   link1_devices = pointToPoint.Install (link1_nodes);
@@ -151,7 +153,7 @@ main (int argc, char *argv[])
   ltpHelper.SetAttributes ("CheckPointRtxLimit",  UintegerValue (20),
                            "ReportSegmentRtxLimit", UintegerValue (20),
                            "RetransCyclelimit",  UintegerValue (20),
-                           "OneWayLightTime", StringValue ("5ms"));
+                           "OneWayLightTime", StringValue (channelDelay.str ()));
   ltpHelper.SetLtpIpResolutionTable (routing);
   ltpHelper.SetBaseLtpEngineId (0);
   //ltpHelper.SetStartTransmissionTime (Seconds (1));
@@ -171,7 +173,7 @@ main (int argc, char *argv[])
   std::ostringstream l4type;
   l4type << "Ltp";
   Config::SetDefault ("ns3::BundleProtocol::L4Type", StringValue (l4type.str ()));
-  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (500));  // set bundle fragmentation size to 400 bytes
+  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (1000));  // set bundle fragmentation size to 400 bytes
 
   // build endpoint ids
   BpEndpointId eidSender ("dtn", "node0");
@@ -265,7 +267,7 @@ main (int argc, char *argv[])
 
   // receive function
   Simulator::Schedule (Seconds (0.8), &Receive_char_array, bpReceivers.Get (0), eidRecv);
-  if (tracing)
+  if (false)
     {
       AsciiTraceHelper ascii;
       pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("bundle-protocol-multihop-tcp.tr"));

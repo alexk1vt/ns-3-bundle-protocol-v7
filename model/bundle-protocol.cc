@@ -88,6 +88,23 @@ BundleProtocol::BundleProtocol ()
 BundleProtocol::~BundleProtocol ()
 { 
   NS_LOG_FUNCTION (this);
+  m_node = 0;
+  m_cla = 0;
+
+  // Clear out the receive buffer and derefence
+  m_bpRxBufferPacket->RemoveAtStart (m_bpRxBufferPacket->GetSize ());
+  m_bpRxBufferPacket = 0;
+
+  m_bpRoutingProtocol = 0;
+  BpSendBundleStore.clear ();
+  BpRecvBundleStore.clear ();
+  BpRegistration.clear ();
+  BpRecvFragMap.clear ();
+
+  // clear the queue by swapping with empty queue
+  std::queue<std::vector <uint8_t> > empty;
+  std::swap (m_bpRxCborVectorQueue, empty);
+
 }
 
 void 
@@ -296,7 +313,7 @@ BundleProtocol::Send_data (const uint8_t* data, const uint32_t data_size, const 
     { 
       uint32_t copySize = std::min (total, m_bundleSize);
     
-      Ptr<BpBundle> bundle = Create<BpBundle> (0, src, dst, copySize, reinterpret_cast<const uint8_t*>(data + offset));
+      Ptr<BpBundle> bundle = CreateObject<BpBundle> (0, src, dst, copySize, reinterpret_cast<const uint8_t*>(data + offset));
       bundle->GetPrimaryBlockPtr ()->SetDestinationEid (dst);
       bundle->GetPrimaryBlockPtr ()->SetSourceEid (src);
       bundle->GetPrimaryBlockPtr ()->SetLifetime (0);
@@ -438,7 +455,7 @@ BundleProtocol::RetreiveBundle ()
       std::vector <uint8_t> v_buffer (buffer, buffer + cborBundleSize);
 
       // convert bundle from CBOR to JSON and continue to process
-      Ptr<BpBundle> bundle = Create<BpBundle> ();
+      Ptr<BpBundle> bundle = CreateObject<BpBundle> ();
       
       bundle->SetBundleFromCbor (v_buffer);
 
@@ -454,7 +471,7 @@ BundleProtocol::RetreiveBundle ()
     */
    if (!m_bpRxCborVectorQueue.empty ())
    {
-      Ptr<BpBundle> bundle = Create<BpBundle> ();
+      Ptr<BpBundle> bundle = CreateObject<BpBundle> ();
       std::vector <uint8_t> v_buffer = m_bpRxCborVectorQueue.front ();
       m_bpRxCborVectorQueue.pop ();
       bundle->SetBundleFromCbor (v_buffer);
@@ -473,7 +490,7 @@ BundleProtocol::ReceivePacket (Ptr<Packet> packet)
   uint32_t packetSize = m_bpRxBufferPacket->GetSize ();
   NS_LOG_FUNCTION (this << " Received packet of size: " << packetSize);
   int size_check = 180;
-  if (packetSize > size_check) // keep checking RxBufferPacket for possible bundles
+  if (packetSize > size_check)
   {  
     BpBundleHeader bundleHeader;
     m_bpRxBufferPacket->PeekHeader (bundleHeader);
@@ -628,7 +645,8 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
     BpCanonicalBlock* payloadBlockPtr = bundle->GetPayloadBlockPtr ();
     payloadBlockPtr->SetBlockData (fragmentBuffer);  // replaced bundle ADU with reconstructed ADU
     bpPrimaryBlockPtr->SetIsFragment (false);
-    // Now have reconstructed packet, delete fragment map
+    // Now have reconstructed packet, delete fragment map and erase from BpRecvFragMap
+    (*itBpFrag).second.clear ();
     BpRecvFragMap.erase (FragName);
   }
   

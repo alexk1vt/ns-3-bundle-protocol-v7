@@ -60,6 +60,12 @@ void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, 
   sender->Send_data (reinterpret_cast<const uint8_t*>(data), size, src, dst);
 }
 
+void cla_send_bundle(Ptr<BundleProtocol> sender, char* data, BpEndpointId src, BpEndpointId dst)
+{
+  
+}
+
+
 void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
 {
 
