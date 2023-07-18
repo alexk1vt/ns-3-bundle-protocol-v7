@@ -172,6 +172,12 @@ public:
    */
   virtual int Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst);
 
+  /*
+   * Ultimately going to replace existing 'Send(...)' function as it receives an
+   * NS-3 packet of data and copies the contents into the bundle payload
+  */
+  virtual int Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst);
+
   /**
    * Remove the registration with the eid and close the transport layer connection
    *

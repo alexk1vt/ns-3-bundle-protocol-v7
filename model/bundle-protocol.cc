@@ -301,6 +301,118 @@ BundleProtocol::Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId
   return 0;
 }
 
+int 
+BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst)
+{ 
+  NS_LOG_FUNCTION (this << " " << src.Uri () << " " << dst.Uri ());
+  // check the source eid is registered or not
+  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.end ();
+  it = BpRegistration.find (src);
+  if (it == BpRegistration.end ())
+    {
+      // the local eid is not registered
+      return -1;
+    } 
+  else
+    {
+      // TBD: the lifetime of the eid is expired?
+    }
+
+  uint32_t total = p->GetSize ();
+  uint32_t offset = 0;
+  bool fragment =  ( total > m_bundleSize ) ? true : false;
+
+  // a simple fragementation: ensure a bundle is transmittd by one packet at the transport layer
+  uint32_t num = 0;
+  while ( total > 0 )   
+    { 
+      Ptr<Packet> packet = NULL;
+
+      // build bundle payload header
+      BpPayloadHeader bpph;
+
+      // build primary bundle header
+      BpHeader bph;
+      bph.SetDestinationEid (dst);
+      bph.SetSourceEid (src);
+
+      bph.SetCreateTimestamp (std::time(NULL));
+      bph.SetSequenceNumber (m_seq);
+      m_seq++;
+
+      uint32_t size = std::min (total, m_bundleSize);
+
+      bph.SetBlockLength (size);       
+      bph.SetLifeTime (0);
+
+      
+
+      if (fragment)
+        {
+          bph.SetIsFragment (true);
+          //bph.SetFragOffset (p->GetSize () - size); // wrong!  'size' never changes, so fragments after 1st are incorrect!
+          bph.SetFragOffset (offset);
+          bph.SetAduLength (p->GetSize ());
+        }
+      else
+        {
+          bph.SetIsFragment (false);
+          bph.SetAduLength (p->GetSize ());
+        }
+
+      bph.SetBlockLength (size);       
+      bpph.SetBlockLength (size);
+
+      // copy data to packet
+      //packet = Create<Packet> (reinterpret_cast<uint8_t*>(p) + offset, size);
+      packet = p->CreateFragment(offset, offset+size);
+      //uint8_t* offset_address = (uint8_t*)p + offset;
+      //memcpy (static_cast<Packet>offset_address, packet, size);
+
+      packet->AddHeader (bpph);
+      packet->AddHeader (bph);
+
+      NS_LOG_DEBUG ("Send bundle:" << " seq " << bph.GetSequenceNumber ().GetValue () << 
+                                 " src eid " << bph.GetSourceEid ().Uri () << 
+                                 " dst eid " << bph.GetDestinationEid ().Uri () << 
+                                 " pkt size " << packet->GetSize ());
+
+
+      // store the bundle into persistant sent storage
+      std::map<BpEndpointId, std::queue<Ptr<Packet> > >::iterator it = BpSendBundleStore.end ();
+      it = BpSendBundleStore.find (src);
+      if ( it == BpSendBundleStore.end ())
+        {
+          // this is the first packet sent by this source endpoint id
+          std::queue<Ptr<Packet> > qu;
+          qu.push (packet);
+          BpSendBundleStore.insert (std::pair<BpEndpointId, std::queue<Ptr<Packet> > > (src, qu) );
+        }
+      else
+        {
+          // ongoing packet
+          (*it).second.push (packet);
+        }
+
+      if (m_cla)
+        {
+           m_cla->SendPacket (packet);                             
+           num++;
+        }
+      else
+        NS_FATAL_ERROR ("BundleProtocol::Send (): undefined m_cla");
+
+      total = total - size;
+      offset = offset + size;
+
+      // force the convergence layer to send the packet
+      if (num == 1)
+        m_cla->SendPacket (packet);                             
+    }
+
+  return 0;
+}
+
 int
 BundleProtocol::Close (const BpEndpointId &eid)
 {
@@ -331,8 +443,14 @@ BundleProtocol::RetreiveBundle ()
   // continue to retreive a bundle from buffer until the buffer size is smaller than a bundle or a bundle header 
   // ACS start
   // if (m_bpRxBufferPacket->GetSize () > (bpHeader.GetSerializedSize () + bppHeader.GetSerializedSize ()))
-  if (m_bpRxBufferPacket->GetSize () > 180)
+  
+  //if (m_bpRxBufferPacket->GetSize () > 180)
   // ACS end
+  // AlexK start
+  NS_LOG_DEBUG (this << " Received packet of size: " << m_bpRxBufferPacket->GetSize ());
+  int rand_val = 180;
+  if (m_bpRxBufferPacket->GetSize () > rand_val)
+  // Alexk end
     {
       // since BpHeader's length is a variable, we must also read data buffer size to guarantee that the node 
       // receives a complete primary bundle header and bundle payload header
@@ -351,8 +469,10 @@ BundleProtocol::RetreiveBundle ()
       // if there is not data, we cannot call PeekHeader, since we cannot guarantee a complete primary bundle header and 
       // bundle header is received
 
-      if (buf.GetSize () == 0 )
+      if (buf.GetSize () == 0 ){
+        NS_LOG_DEBUG (this << " Received buffer was size 0. Returning");
         return;
+      }
 
       m_bpRxBufferPacket->PeekHeader (bpHeader);
       m_bpRxBufferPacket->PeekHeader (bppHeader);
@@ -366,6 +486,7 @@ BundleProtocol::RetreiveBundle ()
           Ptr<Packet> bundle = m_bpRxBufferPacket->CreateFragment (0, total) ;
           m_bpRxBufferPacket->RemoveAtStart (total);
 
+          NS_LOG_FUNCTION (this << " Retrieved packet.  Will process and check for more.");
           ProcessBundle (bundle);
           
           // continue to check bundles
@@ -373,13 +494,12 @@ BundleProtocol::RetreiveBundle ()
         }
       else
         {
-          //NS_LOG_DEBUG ("no enough space for a bundle");
+          NS_LOG_DEBUG (this << " Retrieved packet size is smaller than declared size.  Dropping?");
         }
-
     } 
   else
     {
-      //NS_LOG_DEBUG ("no enough space for a bundle header");
+      NS_LOG_DEBUG (this << " Retrieved packet size is: " << std::to_string(m_bpRxBufferPacket->GetSize ()) << "; less than " << std::to_string(rand_val) << " Dropping.");
     }
 
 }
@@ -464,6 +584,7 @@ BundleProtocol::Receive (const BpEndpointId &eid)
   if (it == BpRegistration.end ())
     {
       // the eid is not registered
+      NS_LOG_FUNCTION (this << "The eid is not registered: "<< eid.Uri());
       return emptyPacket;
     } 
   else
@@ -476,6 +597,7 @@ BundleProtocol::Receive (const BpEndpointId &eid)
       if ( itMap == BpRecvBundleStore.end ())
         {
           // do not receive any bundle with this dst eid
+          NS_LOG_FUNCTION (this << "Did not receive any bundle with this dst eid: "<< eid.Uri());
           return emptyPacket;
         }
       else if ( (*itMap).second.size () > 0)
