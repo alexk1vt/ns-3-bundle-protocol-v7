@@ -120,9 +120,14 @@ public:
    */
   virtual Ptr<BpRoutingProtocol> GetRoutingProtocol () = 0; 
 
-  virtual int setL4Address (BpEndpointId eid, InetSocketAddress l4Address) = 0;
-
-  virtual InetSocketAddress getL4Address (BpEndpointId eid) = 0;
+  virtual int SetL4Address (BpEndpointId eid, const InetSocketAddress* l4Address) = 0;
+  //virtual int setL4AddressTcp (BpEndpointId eid, InetSocketAddress l4Address) = 0;
+  //virtual int setL4AddressLtp (BpEndpointId eid, uint64_t l4Address) = 0;
+  //virtual void* getL4Address (BpEndpointId eid) = 0;
+  virtual InetSocketAddress GetL4Address (BpEndpointId eid, InetSocketAddress returnType) = 0;
+  //virtual void SetL4Protocol (void* protocol, uint64_t protocolId);
+  //virtual void SetL4Protocol (Ptr<Socket> protocol, InetSocketAddress l4address) = 0;
+  virtual void SetL4Protocol (std::string l4Type) = 0;
 };
 
 } // namespace ns3

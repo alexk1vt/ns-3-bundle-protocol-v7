@@ -26,7 +26,7 @@
 #include <string>
 
 #include "json.hpp"
-#include "sdnv.h"
+#include "bp-sdnv.h"
 #include <vector>
 #include <ctime>
 
@@ -102,7 +102,8 @@ uint32_t
 BpHeader::GetSerializedSize (void) const
 {
   NS_LOG_FUNCTION (this);
-  SDNV sdnv;
+  //SDNV sdnv;
+  BpSdnv sdnv;
   uint32_t size = 0;
   uint64_t headerLength = 0; // Length without Version and SDNV proc. flags
 
@@ -158,7 +159,8 @@ BpHeader::Serialize (Buffer::Iterator start) const
 {
   NS_LOG_FUNCTION (this);
   Buffer::Iterator i = start;
-  SDNV sdnv;
+  //SDNV sdnv;
+  BpSdnv sdnv;
   uint64_t headerLength = 0; // Length without Version and SDNV proc. flags
   std::vector<uint8_t> headerBody; // Body without
 
@@ -291,7 +293,8 @@ BpHeader::Deserialize (Buffer::Iterator start)
 {
   NS_LOG_FUNCTION (this);
   Buffer::Iterator i = start;
-  SDNV sdnv;
+  //SDNV sdnv;
+  BpSdnv sdnv;
 
   m_version = i.ReadU8 ();
   m_processingFlags = (uint8_t) sdnv.Decode (i);

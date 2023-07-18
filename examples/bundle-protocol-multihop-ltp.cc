@@ -36,9 +36,12 @@
 #include "ns3/bundle-protocol-helper.h"
 #include "ns3/bundle-protocol-container.h"
 
+#include "ns3/ltp-protocol-helper.h"
+#include "ns3/ltp-protocol.h"
+
 using namespace ns3;
 
-NS_LOG_COMPONENT_DEFINE ("BundleProtocolMultihopExample");
+NS_LOG_COMPONENT_DEFINE ("BundleProtocolMultihopLtpExample");
 
 void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, BpEndpointId dst)
 {
@@ -69,10 +72,10 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
     }
 }
 
-void Register (Ptr<BundleProtocol> node, BpEndpointId eid, InetSocketAddress l4Address)
+void Register (Ptr<BundleProtocol> node, BpEndpointId eid, uint64_t l4Address)
 {
     std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
-    node->ExternalRegisterTcp (eid, 0, true, l4Address);
+    node->ExternalRegisterLtp (eid, 0, true, l4Address);
 }
 
 int
@@ -133,24 +136,48 @@ main (int argc, char *argv[])
   staticRouting_node2->AddNetworkRouteTo (Ipv4Address ("0.0.0.0"), Ipv4Mask ("0.0.0.0"), 1);  // setting node0 interface 1 as default route (interface 0 is loopback)
 
   NS_LOG_INFO ("Create bundle applications.");
- 
+  // Now install LTP on the nodes
+
+  // Defines the ClientService ID code that will be using the Ltp protocol in both sides of the link
+  // Bundle protocol code as defined by IANA: "LTP Client Service Identifiers" referenced in RFC 7116
+  uint64_t ClientServiceId = 1; // 1 -- bundle protocol service id
+
+  // Creta a LtpIpResolution table to perform mappings between Ipv4 adresses and LtpEngineIDs
+  Ptr<ns3::ltp::LtpIpResolutionTable> routing =  CreateObjectWithAttributes<ns3::ltp::LtpIpResolutionTable> ("Addressing", StringValue ("Ipv4"));
+
+  // Use a helper to create and install Ltp Protocol instances in the nodes.
+  
+  ns3::ltp::LtpProtocolHelper ltpHelper;
+  ltpHelper.SetAttributes ("CheckPointRtxLimit",  UintegerValue (20),
+                           "ReportSegmentRtxLimit", UintegerValue (20),
+                           "RetransCyclelimit",  UintegerValue (20),
+                           "OneWayLightTime", StringValue ("5ms"));
+  ltpHelper.SetLtpIpResolutionTable (routing);
+  ltpHelper.SetBaseLtpEngineId (0);
+  //ltpHelper.SetStartTransmissionTime (Seconds (1));
+  
+  ltpHelper.InstallAndLink (nodes);
+  
+  // get node L4 addresses
+  uint64_t senderL4addr = link1_nodes.Get (0)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
+  uint64_t forwarderL4addr_link1 = link1_nodes.Get (1)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
+  uint64_t forwarderL4addr_link2 = link2_nodes.Get (0)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
+  uint64_t recvL4addr = link2_nodes.Get (1)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
+
+  // ltpHelper sets remote peers in round-robin fashion
+
+  // Callback registration will occur within the bundle protocol CLA initiatization
+  // Configure the BP nodes for LTP
   std::ostringstream l4type;
-  l4type << "Tcp";
+  l4type << "Ltp";
   Config::SetDefault ("ns3::BundleProtocol::L4Type", StringValue (l4type.str ()));
-  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (200)); 
-  Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (512));
+  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (500));  // set bundle fragmentation size to 400 bytes
 
   // build endpoint ids
   BpEndpointId eidSender ("dtn", "node0");
   BpEndpointId eidForwarder ("dtn", "node1");
   BpEndpointId eidRecv ("dtn", "node2");
  
-  // get node L4 addresses
-  InetSocketAddress senderL4addr (link1_i.GetAddress(0),9);
-  InetSocketAddress forwarderL4addr_link1 (link1_i.GetAddress(1),9);
-  InetSocketAddress forwarderL4addr_link2 (link2_i.GetAddress(0),9);
-  InetSocketAddress recvL4addr (link2_i.GetAddress(1),9);
-
   // set bundle static routing for sender
   Ptr<BpStaticRoutingProtocol> route_sender = CreateObject<BpStaticRoutingProtocol> (); // static routes for sender
   route_sender->AddRoute (eidRecv, eidForwarder); // dest: recv; next_hop: forwarder
@@ -199,11 +226,38 @@ main (int argc, char *argv[])
   Simulator::Schedule (Seconds (0.0), &Register, bpReceivers.Get (0), eidForwarder, forwarderL4addr_link2);
   Simulator::Schedule (Seconds (0.0), &Register, bpReceivers.Get (0), eidSender, senderL4addr);
 
+  /*
   char data[] = "Mr. Chairman, this movement is exclusively the work of politicians; "
                 "a set of men who have interests aside from the interests of the people, and who, "
                 "to say the most of them, are, taken as a mass, at least one long step removed from "
                 "honest men. I say this with the greater freedom because, being a politician myself, "
                 "none can regard it as personal.";
+  */
+  
+  char data[] = "The Senate of the United States shall be composed of two Senators from each State, "
+                "chosen by the Legislature thereof, for six Years; and each Senator shall have one Vote."
+                "Immediately after they shall be assembled in Consequence of the first Election, they shall"
+                " be divided as equally as may be into three Classes. The Seats of the Senators of the"
+                " first Class shall be vacated at the Expiration of the second Year, of the second Class at"
+                " the Expiration of the fourth Year, and of the third Class at the Expiration of the sixth"
+                " Year, so that one third may be chosen every second Year; and if Vacancies happen by "
+                "Resignation, or otherwise, during the Recess of the Legislature of any State, the Executive"
+                " thereof may make temporary Appointments until the next Meeting of the Legislature, which"
+                " shall then fill such Vacancies. No Person shall be a Senator who shall not have attained"
+                " to the Age of thirty Years, and been nine Years a Citizen of the United States, and who"
+                " shall not, when elected, be an Inhabitant of that State for which he shall be chosen."
+                "The Vice President of the United States shall be President of the Senate, but shall have "
+                "no Vote, unless they be equally divided.  The Senate shall chuse their other Officers, "
+                "and also a President pro tempore, in the Absence of the Vice President, or when he shall"
+                " exercise the Office of President of the United States. The Senate shall have the sole "
+                "Power to try all Impeachments. When sitting for that Purpose, they shall be on Oath or"
+                " Affirmation. When the President of the United States is tried, the Chief Justice shall"
+                " preside: And no Person shall be convicted without the Concurrence of two thirds of the "
+                "Members present. Judgment in Cases of Impeachment shall not extend further than to removal"
+                " from Office, and disqualification to hold and enjoy any Office of honor, Trust or Profit"
+                " under the United States: but the Party convicted shall nevertheless be liable and subject"
+                " to Indictment, Trial, Judgment and Punishment, according to Law.";
+  
 
   // sending data bundle
   NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);

@@ -1,5 +1,6 @@
-/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
-/*
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*-
+ * Copyright (c) 2014 Universitat Autnoma de Barcelona
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation;
@@ -12,17 +13,22 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Author: Rubn Martnez <rmartinez@deic.uab.cat>
+ * Adapted for Bundle-Protocol: Alex Kedrowitsch <alexk1@vt.edu>
  */
 
-// Network topology
+//        Network topology
 //
-//       n0 ----------- n1
-//            500 Kbps
-//             5 ms
+//       n0              n1
+//       |               |
+//       =================
+//          PointToPoint
 //
-// - Flow from n0 to n1 using bundle protocol.
-// - Tracing of queues and packet receptions to file "bundle-protocol-simple.tr"
-//   and pcap tracing available when tracing is turned on.
+// - Send a block of data from one service instance in node n0 to the other in node n1.
+// - Data is sent end-to-end through a LtpProtcol <-> UdpLayerAdapter <-> PointToPointLink <-> UdpLayerAdapter <-> LtpProtcol.
+// - Functions (ClientServiceInstanceNotificationsSnd and ClientServiceInstanceNotificationsRcv) are used for tracing
+//
 
 #include <string>
 #include <fstream>
@@ -35,11 +41,15 @@
 #include "ns3/bp-static-routing-protocol.h"
 #include "ns3/bundle-protocol-helper.h"
 #include "ns3/bundle-protocol-container.h"
-//#include "ns3/ltp-protocol.h"
+
+#include "ns3/ltp-protocol-helper.h"
+#include "ns3/ltp-protocol.h"
+//#include "ns3/ltp-header.h"
 
 using namespace ns3;
+//using namespace ltp;
 
-NS_LOG_COMPONENT_DEFINE ("BundleProtocolSimpleExample");
+NS_LOG_COMPONENT_DEFINE ("BundleProtocolLtpSimple");
 
 void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, BpEndpointId dst)
 {
@@ -70,10 +80,10 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
     }
 }
 
-void Register (Ptr<BundleProtocol> node, BpEndpointId eid, InetSocketAddress l4Address)
+void Register (Ptr<BundleProtocol> node, BpEndpointId eid, uint64_t l4Address)
 {
     std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
-    node->ExternalRegisterTcp (eid, 0, true, l4Address);
+    node->ExternalRegisterLtp (eid, 0, true, l4Address);
 }
 
 int
@@ -89,6 +99,8 @@ main (int argc, char *argv[])
   nodes.Create (2);
 
   NS_LOG_INFO ("Create channels.");
+
+  //TimeValue channelDelay = TimeValue(StringValue ("5ms"));
 
   PointToPointHelper pointToPoint;
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("500Kbps"));
@@ -107,20 +119,41 @@ main (int argc, char *argv[])
 
   NS_LOG_INFO ("Create bundle applications.");
  
- // -- This is getting into CL stuff.  Will need to ensure interface clearly delineates CLAs for each node
+  // Now install LTP on the nodes
+
+  // Defines the ClientService ID code that will be using the Ltp protocol in both sides of the link
+  // Bundle protocol code as defined by IANA: "LTP Client Service Identifiers" referenced in RFC 7116
+  uint64_t ClientServiceId = 1; // 1 -- bundle protocol service id
+
+  // Creta a LtpIpResolution table to perform mappings between Ipv4 adresses and LtpEngineIDs
+  Ptr<ns3::ltp::LtpIpResolutionTable> routing =  CreateObjectWithAttributes<ns3::ltp::LtpIpResolutionTable> ("Addressing", StringValue ("Ipv4"));
+
+  // Use a helper to create and install Ltp Protocol instances in the nodes.
+  
+  ns3::ltp::LtpProtocolHelper ltpHelper;
+  ltpHelper.SetAttributes ("CheckPointRtxLimit",  UintegerValue (20),
+                           "ReportSegmentRtxLimit", UintegerValue (20),
+                           "RetransCyclelimit",  UintegerValue (20),
+                           "OneWayLightTime", StringValue ("5ms")); //5ms"));
+  ltpHelper.SetLtpIpResolutionTable (routing);
+  ltpHelper.SetBaseLtpEngineId (0);
+  //ltpHelper.SetStartTransmissionTime (Seconds (1));
+  ltpHelper.InstallAndLink (nodes);
+
+  // Callback registration will occur within the bundle protocol CLA initiatization
+  // Configure the BP nodes for LTP
   std::ostringstream l4type;
-  l4type << "Tcp";
+  l4type << "Ltp";
   Config::SetDefault ("ns3::BundleProtocol::L4Type", StringValue (l4type.str ()));
   Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (200)); // 400));  // -- is this saying bundles are segmented into 400 bytes?
-  Config::SetDefault ("ns3::TcpSocket::SegmentSize", UintegerValue (512));  // -- and packets are segmented into 512 bytes (I'm assuming assuming the 112 byte difference is tcp/bp header overhead)
 
   // build endpoint ids
   BpEndpointId eidSender ("dtn", "node0");
   BpEndpointId eidRecv ("dtn", "node1");
 
   // get node L4 addresses
-  InetSocketAddress Node0Addr (i.GetAddress (0), 9);
-  InetSocketAddress Node1Addr (i.GetAddress (1), 9);
+  uint64_t Node0L4Addr = nodes.Get (0)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
+  uint64_t Node1L4Addr = nodes.Get (1)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
 
   // set bundle static routing for node0
   Ptr<BpStaticRoutingProtocol> RouteNode0 = CreateObject<BpStaticRoutingProtocol> (); // No need for routing when directly connected, just have an object created
@@ -128,11 +161,7 @@ main (int argc, char *argv[])
   // set bundle static routing for node1
   Ptr<BpStaticRoutingProtocol> RouteNode1 = CreateObject<BpStaticRoutingProtocol> ();  // No need for routing when directly connected, just have an object created
 
-  // sender  
-  // -- So each BP node is assigned a routing protocol (with static/dynamic routes)
-  // -- Need to ensure seperation from BP routes and CL routes --> look into RFCs!
-
-  // -- are the endpoints being registered here?  How do endpoints get discovered across a network?
+  // sender
   BundleProtocolHelper bpSenderHelper;
   bpSenderHelper.SetRoutingProtocol (RouteNode0);
   bpSenderHelper.SetBpEndpointId (eidSender);
@@ -149,8 +178,8 @@ main (int argc, char *argv[])
   bpReceivers.Stop (Seconds (1.0));
 
   // register external nodes with each node
-  Simulator::Schedule (Seconds (0.0), &Register, bpSenders.Get (0), eidRecv, Node1Addr);
-  Simulator::Schedule (Seconds (0.0), &Register, bpReceivers.Get (0), eidSender, Node0Addr);
+  Simulator::Schedule (Seconds (0.0), &Register, bpSenders.Get (0), eidRecv, Node1L4Addr);
+  Simulator::Schedule (Seconds (0.0), &Register, bpReceivers.Get (0), eidSender, Node0L4Addr);
 
   // send 1000 bytes bundle 
   
@@ -209,8 +238,8 @@ main (int argc, char *argv[])
   if (tracing)
     {
       AsciiTraceHelper ascii;
-      pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("bundle-protocol-simple.tr"));
-      pointToPoint.EnablePcapAll ("bundle-protocol-simple", false);
+      pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("bundle-protocol-ltp-simple.tr"));
+      pointToPoint.EnablePcapAll ("bundle-protocol-ltp-simple", false);
     }
 
   NS_LOG_INFO ("Run Simulation.");

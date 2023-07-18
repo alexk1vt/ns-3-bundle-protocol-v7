@@ -193,9 +193,18 @@ public:
    */
   void DataRecv (Ptr<Socket> socket);
 
-  virtual int setL4Address (BpEndpointId eid, InetSocketAddress l4Address);
+  virtual int SetL4Address (BpEndpointId eid, const InetSocketAddress* l4Address);
+  //virtual int setL4AddressLtp (BpEndpointId eid, InetSocketAddress l4Address) = 0;
+  //virtual int setL4Address (BpEndpointId eid, void* l4Address);
+  virtual InetSocketAddress GetL4Address (BpEndpointId eid, InetSocketAddress returnType);
+  //uint64_t getL4AddressLtp (BpEndpointId eid) = 0;
+  //virtual void* getL4Address (BpEndpointId eid);
+  //virtual void SetL4Protocol (Ptr<Socket> protocol, InetSocketAddress address);
+  virtual void SetL4Protocol (std::string l4Type);
 
-  virtual InetSocketAddress getL4Address (BpEndpointId eid);
+  //virtual int setL4AddressGeneric (BpEndpointId eid, unsigned char &l4Address);
+  //virtual unsigned char* getL4AddressGeneric (BpEndpointId eid);
+  
 
 private:
 
@@ -219,6 +228,7 @@ private:
   virtual void RetrySocketConn (Ptr<BpBundle> packet);
 
 private:
+
   Ptr<BundleProtocol> m_bp;                             /// bundle protocol
   std::map<BpEndpointId, Ptr<Socket> > m_l4SendSockets; /// the transport layer sender sockets
   std::map<BpEndpointId, Ptr<Socket> > m_l4RecvSockets; /// the transport layer receiver sockets

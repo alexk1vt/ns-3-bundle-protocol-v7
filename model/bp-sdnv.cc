@@ -23,24 +23,24 @@
 #include <algorithm>
 #include <stdint.h>
 #include "ns3/log.h"
-#include "sdnv.h"
+#include "bp-sdnv.h"
 
-NS_LOG_COMPONENT_DEFINE ("SDNV");
+NS_LOG_COMPONENT_DEFINE ("BP_SDNV_H");
 
 namespace ns3 {
 
-SDNV::SDNV ()
+BpSdnv::BpSdnv ()
 {
   NS_LOG_FUNCTION (this);
 }
 
-SDNV::~SDNV ()
+BpSdnv::~BpSdnv ()
 {
   NS_LOG_FUNCTION (this);
 }
 
 std::vector<uint8_t>
-SDNV::Encode (uint64_t val)
+BpSdnv::Encode (uint64_t val)
 {
   NS_LOG_FUNCTION (this << " " << val);
   std::vector<uint8_t> data;
@@ -68,7 +68,7 @@ SDNV::Encode (uint64_t val)
 }
 
 uint32_t
-SDNV::EncodingLength(uint64_t val)
+BpSdnv::EncodingLength(uint64_t val)
 {
   NS_LOG_FUNCTION (this << " " << val);
 
@@ -84,7 +84,7 @@ SDNV::EncodingLength(uint64_t val)
 }
 
 uint64_t
-SDNV::Decode (std::vector<uint8_t> val)
+BpSdnv::Decode (std::vector<uint8_t> val)
 {
   NS_LOG_FUNCTION (this);
   uint64_t decoded = 0;
@@ -102,7 +102,7 @@ SDNV::Decode (std::vector<uint8_t> val)
 }
 
 uint64_t
-SDNV::Decode (Buffer::Iterator &start)
+BpSdnv::Decode (Buffer::Iterator &start)
 {
   NS_LOG_FUNCTION (this);
   std::vector<uint8_t> vec;
@@ -120,7 +120,7 @@ SDNV::Decode (Buffer::Iterator &start)
 }
 
 uint32_t 
-SDNV::Length(std::vector<uint8_t> val)
+BpSdnv::Length(std::vector<uint8_t> val)
 {
   uint32_t val_len = 1;
   std::vector<uint8_t>::iterator iter;
@@ -135,7 +135,7 @@ SDNV::Length(std::vector<uint8_t> val)
 }
 
 bool
-SDNV::IsLast (uint8_t &val)
+BpSdnv::IsLast (uint8_t &val)
 {
   NS_LOG_FUNCTION (this << " " << (uint16_t)val);
   if ((val & 0x80) == 0)

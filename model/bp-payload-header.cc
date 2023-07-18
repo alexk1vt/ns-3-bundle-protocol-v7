@@ -20,7 +20,7 @@
 
 #include "ns3/log.h"
 #include "bp-payload-header.h"
-#include "sdnv.h"
+#include "bp-sdnv.h"
 #include <stdio.h>
 #include <vector>
 
@@ -63,7 +63,8 @@ uint32_t
 BpPayloadHeader::GetSerializedSize (void) const
 {
   NS_LOG_FUNCTION (this);
-  SDNV sdnv;
+  //SDNV sdnv;
+  BpSdnv sdnv;
 
   uint32_t size = 0;
   size += sizeof(m_blockType);
@@ -85,7 +86,8 @@ BpPayloadHeader::Serialize (Buffer::Iterator start) const
 {
   NS_LOG_FUNCTION (this);
   Buffer::Iterator i = start;
-  SDNV sdnv;
+  //SDNV sdnv;
+  BpSdnv sdnv;
   std::vector<uint8_t> result; // store encoded results
 
   // Block Type
@@ -124,7 +126,8 @@ BpPayloadHeader::Deserialize (Buffer::Iterator start)
 {
   NS_LOG_FUNCTION (this);
   Buffer::Iterator i = start;
-  SDNV sdnv;
+  //SDNV sdnv;
+  BpSdnv sdnv;
 
   m_blockType = i.ReadU8 ();
   m_processingControlFlags = (uint8_t) sdnv.Decode (i);

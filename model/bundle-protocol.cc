@@ -30,6 +30,7 @@
 #include "ns3/string.h"
 #include "ns3/buffer.h"
 #include "bp-tcp-cla-protocol.h"
+#include "bp-ltp-cla-protocol.h"
 #include "bundle-protocol.h"
 //#include "bp-header.h"
 //#include "bp-payload-header.h"
@@ -102,6 +103,18 @@ BundleProtocol::Open (Ptr<Node> node)
       m_cla = cla;
       m_cla->SetBundleProtocol (this);
     }
+  else if (m_l4Type == "Ltp")
+    {
+      Ptr<BpLtpClaProtocol> cla = CreateObject<BpLtpClaProtocol>();
+      m_cla = cla;
+      m_cla->SetBundleProtocol (this);
+      //m_cla->SetL4Protocol (static_cast<void*>(m_node->GetObject<ns3::ltp::LtpProtocol>()), m_node->GetObject<ns3::ltp::LtpProtocol>()->GetLocalEngineId ()); // LTP requires pointer to the protocol to operate
+      //ns3::Ptr<ns3::ltp::LtpProtocol> protocol = m_node->GetObject<ns3::ltp::LtpProtocol>();
+      //uint64_t engineId = protocol->GetLocalEngineId ();
+      //m_cla->SetL4Protocol (m_node->GetObject<ns3::ltp::LtpProtocol>(), m_node->GetObject<ns3::ltp::LtpProtocol>()->GetLocalEngineId ()); 
+      //m_cla->SetL4Protocol (protocol, engineId);//, true);
+      m_cla->SetL4Protocol (m_l4Type);
+    }
   else
     {
       NS_FATAL_ERROR ("BundleProtocol::Open (): unknown tranport layer protocol type! " << m_l4Type);   
@@ -139,9 +152,42 @@ BundleProtocol::SetBpEndpointId (BpEndpointId eid)
 }
 
 int
-BundleProtocol::ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state, const InetSocketAddress l4Address)
+BundleProtocol::ExternalRegisterTcp (const BpEndpointId &eid, const double lifetime, const bool state, const InetSocketAddress l4Address)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri () << " Tcp");
+  BpRegisterInfo info;
+  info.lifetime = lifetime;
+  info.state = state;
+  info.cla = m_cla;
+  int retval = m_cla->SetL4Address (eid, &l4Address);
+  if (retval < 0)
+  {
+    return -1;
+  }
+  return Register (eid, info);
+}
+
+int
+BundleProtocol::ExternalRegisterLtp (const BpEndpointId &eid, const double lifetime, const bool state, const uint64_t l4Address)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri () << " Ltp");
+  BpRegisterInfo info;
+  info.lifetime = lifetime;
+  info.state = state;
+  info.cla = m_cla;
+  int retval = m_cla->SetL4Address (eid, reinterpret_cast<const InetSocketAddress*>(&l4Address));
+  if (retval < 0)
+  {
+    return -1;
+  }
+  return Register (eid, info);
+}
+/*
+int
+BundleProtocol::ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state, void* l4Address)
 {
   NS_LOG_FUNCTION (this << " " << eid.Uri ());
+
   BpRegisterInfo info;
   info.lifetime = lifetime;
   info.state = state;
@@ -153,7 +199,7 @@ BundleProtocol::ExternalRegister (const BpEndpointId &eid, const double lifetime
   }
   return Register (eid, info);
 }
-
+*/
 int 
 BundleProtocol::Register (const BpEndpointId &eid, const struct BpRegisterInfo &info)
 { 
@@ -182,7 +228,6 @@ BundleProtocol::Register (const BpEndpointId &eid, const struct BpRegisterInfo &
       NS_FATAL_ERROR ("BundleProtocol::Register (): duplicate registration with endpoint id ");
       return -1;
     }
-
 }
 
 int 
@@ -370,7 +415,7 @@ void
 BundleProtocol::RetreiveBundle ()
 { 
   NS_LOG_FUNCTION (this);
-
+  /*
   uint32_t size = m_bpRxBufferPacket->GetSize ();
   NS_LOG_FUNCTION (this << " Received packet of size: " << size);
   int size_check = 180;
@@ -394,6 +439,7 @@ BundleProtocol::RetreiveBundle ()
 
       // convert bundle from CBOR to JSON and continue to process
       Ptr<BpBundle> bundle = Create<BpBundle> ();
+      
       bundle->SetBundleFromCbor (v_buffer);
 
       m_bpRxBufferPacket->RemoveAtStart (cborBundleSize);
@@ -405,6 +451,16 @@ BundleProtocol::RetreiveBundle ()
     {
       NS_LOG_DEBUG (this << " Retrieved packet size is: " << std::to_string(m_bpRxBufferPacket->GetSize ()) << "; less than " << std::to_string(size_check) << ". Skipping and waiting for additional data.");
     }
+    */
+   if (!m_bpRxCborVectorQueue.empty ())
+   {
+      Ptr<BpBundle> bundle = Create<BpBundle> ();
+      std::vector <uint8_t> v_buffer = m_bpRxCborVectorQueue.front ();
+      m_bpRxCborVectorQueue.pop ();
+      bundle->SetBundleFromCbor (v_buffer);
+      ProcessBundle (bundle); // now process the bundle and perform follow-on actions
+      Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this); // see if there are any additional bundles to process
+   }
 }
 
 void 
@@ -414,7 +470,38 @@ BundleProtocol::ReceivePacket (Ptr<Packet> packet)
   // add packets into receive buffer
   m_bpRxBufferPacket->AddAtEnd (packet);
 
+  uint32_t packetSize = m_bpRxBufferPacket->GetSize ();
+  NS_LOG_FUNCTION (this << " Received packet of size: " << packetSize);
+  int size_check = 180;
+  if (packetSize > size_check) // keep checking RxBufferPacket for possible bundles
+  {  
+    BpBundleHeader bundleHeader;
+    m_bpRxBufferPacket->PeekHeader (bundleHeader);
+    uint32_t declaredCborBundleSize = bundleHeader.GetBundleSize();
+    if (packetSize < declaredCborBundleSize)
+    {
+      // the bundle is not complete
+      NS_LOG_FUNCTION (this << " Retrieved packet size is smaller than declared size.  Will not process and wait for further transmissions.");
+      return;
+    }
+    NS_LOG_FUNCTION (this << " Recieved bundle of size: " << declaredCborBundleSize);
+    m_bpRxBufferPacket->RemoveHeader (bundleHeader);
+    uint8_t buffer[declaredCborBundleSize];
+    m_bpRxBufferPacket->CopyData (&buffer[0], declaredCborBundleSize);
+    std::vector <uint8_t> v_buffer (buffer, buffer + declaredCborBundleSize);
+    m_bpRxCborVectorQueue.push (v_buffer);
+    m_bpRxBufferPacket->RemoveAtStart (declaredCborBundleSize);
     Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this);
+    //uint32_t packetSize = m_bpRxBufferPacket->GetSize ();
+  }
+}
+
+void
+BundleProtocol::ReceiveCborVector (std::vector <uint8_t> v_bundle)
+{ 
+  NS_LOG_FUNCTION (this << " Received vector of " << v_bundle.size () << " bytes");
+  m_bpRxCborVectorQueue.push (v_bundle);
+  Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this);
 }
 
 void 
@@ -625,7 +712,6 @@ BundleProtocol::Receive (const BpEndpointId &eid)
           return emptyBundle;
         }
     }
-
 }
 
 BpEndpointId 
@@ -634,7 +720,6 @@ BundleProtocol::GetBpEndpointId () const
   NS_LOG_FUNCTION (this);
   return m_eid;
 }
-
 
 void
 BundleProtocol::SetRoutingProtocol (Ptr<BpRoutingProtocol> route)

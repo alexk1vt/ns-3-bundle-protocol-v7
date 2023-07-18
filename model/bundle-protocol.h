@@ -87,7 +87,50 @@ public:
    */
   virtual void Open (Ptr<Node> node);
 
-  int ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state, const InetSocketAddress l4Address);
+  /**
+   * \brief Register an external endpoint id to the local bundle protocol
+   * 
+   * This method allows the local bundle protocol to send and receive bundles
+   * from the external bundle protocol.  External registration also requires
+   * the L4 address of the external node for successful bundle delivery over
+   * the specified CLA.
+   * 
+   * \param eid the endpoint id of the external bundle protocol
+   * \param lifetime the lifetime of the registration in seconds
+   * \param state the state of the registration
+   * \param l4Address the L4 address of the external node typecasted to unsigned char
+  */
+  //int ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state, void* l4Address);
+
+  /**
+   * \brief Register an external endpoint id to the local bundle protocol via Tcp
+   * 
+   * This method allows the local bundle protocol to send and receive bundles
+   * from the external bundle protocol.  External registration also requires
+   * the L4 address of the external node for successful bundle delivery over
+   * the specified CLA.
+   * 
+   * \param eid the endpoint id of the external bundle protocol
+   * \param lifetime the lifetime of the registration in seconds
+   * \param state the state of the registration
+   * \param l4Address the L4 address of the external node
+  */
+  int ExternalRegisterTcp (const BpEndpointId &eid, const double lifetime, const bool state, const InetSocketAddress l4Address);
+
+  /**
+   * \brief Register an external endpoint id to the local bundle protocol via Ltp
+   * 
+   * This method allows the local bundle protocol to send and receive bundles
+   * from the external bundle protocol.  External registration also requires
+   * the L4 address of the external node for successful bundle delivery over
+   * the specified CLA.
+   * 
+   * \param eid the endpoint id of the external bundle protocol
+   * \param lifetime the lifetime of the registration in seconds
+   * \param state the state of the registration
+   * \param l4Address the L4 address of the external node
+  */
+  int ExternalRegisterLtp (const BpEndpointId &eid, const double lifetime, const bool state, const uint64_t l4Address);
 
   /**
    * \brief Register a local endpoint id in the bundle protocol
@@ -120,7 +163,6 @@ public:
    * returns 0.
    */
   virtual int Unregister (const BpEndpointId &eid); 
-
 
   /**
    * \brief Set the registration into active state
@@ -241,6 +283,15 @@ public:
    * \param packet packet received from the transport layer
    */
   void ReceivePacket (Ptr<Packet> packet);
+
+
+  /**
+   * Receive bundle from the convergence layer and store 
+   * the bundle into storage
+   * 
+   * \param v_bundle vector of bytes received from the transport layer
+  */
+  void ReceiveCborVector (std::vector <uint8_t> v_bundle);
 
   /**
    * Get and delete a bundle from the persistant storage
@@ -373,13 +424,13 @@ private:
 
   Ptr<Packet> m_bpRxBufferPacket; /// a buffer for all packets received from the CLA; bundles are retreived from this buffer
   //Ptr<BpBundle> m_bpRxBufferPacket; /// a buffer for all packets received from the CLA; bundles are retreived from this buffer
+  std::queue<std::vector <uint8_t> > m_bpRxCborVectorQueue; /// a queue for all CBOR bundles received from the CLA; bundles are retreived from this queue
 
   SequenceNumber32 m_seq;         /// the bundle sequence number
 
   BpEndpointId m_eid;             /// unique id for endpoint id
   BpRegisterInfo m_bpRegInfo;     /// register information
   Ptr<BpRoutingProtocol> m_bpRoutingProtocol; /// bundle routing protocol
-
   Time m_startTime;         /// The simulation time that the bundle protocol will start
   Time m_stopTime;          /// The simulation time that the bundle protocol will end
   EventId m_startEvent;     /// The event that will fire at m_startTime to start the bundle protocol
