@@ -27,6 +27,7 @@
 #include "ns3/object.h"
 #include "ns3/event-id.h"
 #include "ns3/nstime.h"
+#include "ns3/inet-socket-address.h"
 #include <string>
 #include <map>
 #include <queue>
@@ -39,12 +40,14 @@ namespace ns3 {
 struct BpRegisterInfo {
   BpRegisterInfo () 
     : lifetime (0),
-      state (true)
+      state (true),
+      cla (NULL)
     {
     }
 
   double lifetime;   /// the lifetime of a bundle in seconds
   bool state;        /// the register state of registration
+  Ptr<BpClaProtocol> cla;
 };
 
 /**
@@ -79,6 +82,8 @@ public:
    * \param node the pointer of bundle node
    */
   virtual void Open (Ptr<Node> node);
+
+  int ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state, const InetSocketAddress l4Address);
 
   /**
    * \brief Register a local endpoint id in the bundle protocol
@@ -172,6 +177,12 @@ public:
    */
   virtual int Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst);
 
+  /* Function to provide a file path - File will be read, possibly fragmented, and sent to destination EID
+  * Receiving end will still call Receive(..) and receive packets as they come in.  It's up to them on what they do with the data (save as file, etc...).
+  * Will need to ensure bundle/packet sequencing is performed whereever the RFC requires
+  */
+  virtual int Send_file (std::string file_path, const BpEndpointId &src, const BpEndpointId &dst);
+
   /*
    * Ultimately going to replace existing 'Send(...)' function as it receives an
    * NS-3 packet of data and copies the contents into the bundle payload
@@ -184,6 +195,8 @@ public:
    * \param eid endpoint id to be removed
    */
   virtual int Close (const BpEndpointId &eid);  
+
+  int ForwardBundle (Ptr<Packet> bundle);
 
   /**
    *  \brief Receive bundle with dst eid
@@ -319,6 +332,8 @@ private:
   std::map<BpEndpointId, std::queue<Ptr<Packet> > > BpSendBundleStore; /// persistant storage of sent bundles: map (source endpoint id, bundle packet queue )
   std::map<BpEndpointId, std::queue<Ptr<Packet> > > BpRecvBundleStore; /// persistant storage of received bundles: map (destination endpoint id, bundle packet queue )
   std::map<BpEndpointId, BpRegisterInfo> BpRegistration; /// persistant storage of registrations: map (local endpoint id, registration information)
+
+  std::map<std::string, std::map<u_int32_t, Ptr<Packet> > > BpRecvFragMap; /// mapping of partial bundle fragment buffers
 
   Ptr<Packet> m_bpRxBufferPacket; /// a buffer for all packets received from the CLA; bundles are retreived from this buffer
 

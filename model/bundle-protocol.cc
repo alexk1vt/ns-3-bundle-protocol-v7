@@ -132,18 +132,34 @@ BundleProtocol::SetBpEndpointId (BpEndpointId eid)
   m_eid = eid;
 }
 
+int
+BundleProtocol::ExternalRegister (const BpEndpointId &eid, const double lifetime, const bool state, const InetSocketAddress l4Address)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri ());
+  BpRegisterInfo info;
+  info.lifetime = lifetime;
+  info.state = state;
+  info.cla = m_cla;
+  int retval = m_cla->setL4Address (eid, l4Address);
+  if (retval < 0)
+  {
+    return -1;
+  }
+  return Register (eid, info);
+}
+
 int 
 BundleProtocol::Register (const BpEndpointId &eid, const struct BpRegisterInfo &info)
 { 
   NS_LOG_FUNCTION (this << " " << eid.Uri ());
-  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.end ();
-  it = BpRegistration.find (eid);
+  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.find (eid);
   if (it == BpRegistration.end ())
     {
       // insert a registration of local endpoint id in the registration storage
       BpRegisterInfo rInfo;
       rInfo.lifetime = info.lifetime;
       rInfo.state = info.state;
+      rInfo.cla = info.cla;
       BpRegistration.insert (std::pair<BpEndpointId, BpRegisterInfo> (eid, rInfo));
 
       if (info.state)
@@ -197,6 +213,20 @@ BundleProtocol::Bind (const BpEndpointId &eid)
     }
 }
 
+int
+BundleProtocol::Send_file (std::string file_path, const BpEndpointId &src, const BpEndpointId &dst)
+{
+  // reference value of m_bundleSize for fragmenting
+  // can I just read the file and store into an NS-3 packet, then call Send_packet?  what's the upper-limit on NS-3 packet sizes?
+
+  // Otherwise I'll need to build my own header and such.  Work that should be performed by underlying layers...
+  return 0;
+}
+
+/*
+* NOTE:  Send(..) will be replaced by contents of Send_packet(..) once it has been fully vetted.
+* Do not rely on /reference this code for future development - reference Send_packet(..) instead
+*/
 int 
 BundleProtocol::Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst)
 { 
@@ -285,8 +315,15 @@ BundleProtocol::Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId
 
       if (m_cla)
         {
-           m_cla->SendPacket (packet);                             
-           num++;
+           //m_cla->SendPacket (packet);
+           if (m_cla->SendPacket (packet) == 0)
+           {
+             num++;
+           }
+           else
+           {
+            NS_LOG_FUNCTION(this << " " << "CLA unable to send to send bundle");
+           }
         }
       else
         NS_FATAL_ERROR ("BundleProtocol::Send (): undefined m_cla");
@@ -295,7 +332,10 @@ BundleProtocol::Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId
 
       // force the convergence layer to send the packet
       if (num == 1)
-        m_cla->SendPacket (packet);                             
+        if (m_cla->SendPacket (packet) != 0)
+        {
+          NS_LOG_FUNCTION(this << " " << "CLA unable to send to send bundle");
+        }
     }
 
   return 0;
@@ -322,8 +362,13 @@ BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEnd
   uint32_t offset = 0;
   bool fragment =  ( total > m_bundleSize ) ? true : false;
 
+  NS_LOG_FUNCTION("Received PDU of size: " << total << "; max bundle size is: " << m_bundleSize << (( total > m_bundleSize ) ? "Fragmenting" : "No Fragmenting"));
+
   // a simple fragementation: ensure a bundle is transmittd by one packet at the transport layer
-  uint32_t num = 0;
+  SequenceNumber32 seqNum (0);
+
+  std::time_t timestamp = std::time(NULL);
+
   while ( total > 0 )   
     { 
       Ptr<Packet> packet = NULL;
@@ -336,23 +381,22 @@ BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEnd
       bph.SetDestinationEid (dst);
       bph.SetSourceEid (src);
 
-      bph.SetCreateTimestamp (std::time(NULL));
-      bph.SetSequenceNumber (m_seq);
-      m_seq++;
+      bph.SetCreateTimestamp (timestamp);
+      bph.SetSequenceNumber (seqNum);
+      //m_seq++;
 
       uint32_t size = std::min (total, m_bundleSize);
 
       bph.SetBlockLength (size);       
       bph.SetLifeTime (0);
 
-      
-
       if (fragment)
         {
           bph.SetIsFragment (true);
           //bph.SetFragOffset (p->GetSize () - size); // wrong!  'size' never changes, so fragments after 1st are incorrect!
           bph.SetFragOffset (offset);
-          bph.SetAduLength (p->GetSize ());
+          bph.SetAduLength (p->GetSize ()); // ADU length specifies the original ADU size
+          NS_LOG_FUNCTION ("Current fragment offset: " << offset << ". Current fragment size: " << size);
         }
       else
         {
@@ -364,15 +408,12 @@ BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEnd
       bpph.SetBlockLength (size);
 
       // copy data to packet
-      //packet = Create<Packet> (reinterpret_cast<uint8_t*>(p) + offset, size);
-      packet = p->CreateFragment(offset, offset+size);
-      //uint8_t* offset_address = (uint8_t*)p + offset;
-      //memcpy (static_cast<Packet>offset_address, packet, size);
+      packet = p->CreateFragment(offset, size);
 
       packet->AddHeader (bpph);
       packet->AddHeader (bph);
 
-      NS_LOG_DEBUG ("Send bundle:" << " seq " << bph.GetSequenceNumber ().GetValue () << 
+      NS_LOG_FUNCTION ("Send bundle:" << " seq " << bph.GetSequenceNumber ().GetValue () << 
                                  " src eid " << bph.GetSourceEid ().Uri () << 
                                  " dst eid " << bph.GetDestinationEid ().Uri () << 
                                  " pkt size " << packet->GetSize ());
@@ -397,7 +438,7 @@ BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEnd
       if (m_cla)
         {
            m_cla->SendPacket (packet);                             
-           num++;
+           seqNum++;
         }
       else
         NS_FATAL_ERROR ("BundleProtocol::Send (): undefined m_cla");
@@ -406,10 +447,46 @@ BundleProtocol::Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEnd
       offset = offset + size;
 
       // force the convergence layer to send the packet
-      if (num == 1)
-        m_cla->SendPacket (packet);                             
+      //if (num == 1)
+      //  m_cla->SendPacket (packet);                             
     }
 
+  return 0;
+}
+
+int
+BundleProtocol::ForwardBundle (Ptr<Packet> bundle)
+{
+  NS_LOG_FUNCTION (this << " " << bundle);
+  BpHeader bpHeader;         // primary bundle header
+  bundle->PeekHeader (bpHeader);
+  BpEndpointId src = bpHeader.GetSourceEid ();
+
+  // store the bundle into persistant sent storage
+  std::map<BpEndpointId, std::queue<Ptr<Packet> > >::iterator it = BpSendBundleStore.end ();
+  it = BpSendBundleStore.find (src);
+  if ( it == BpSendBundleStore.end ())
+    {
+      // this is the first packet sent by this source endpoint id
+      std::queue<Ptr<Packet> > qu;
+      qu.push (bundle);
+      BpSendBundleStore.insert (std::pair<BpEndpointId, std::queue<Ptr<Packet> > > (src, qu) );
+    }
+  else
+    {
+      // ongoing packet
+      (*it).second.push (bundle);
+    }
+
+  if (m_cla)
+    {
+        m_cla->SendPacket (bundle);                             
+    }
+  else
+  {
+    NS_FATAL_ERROR ("BundleProtocol::ForwardBundle (): undefined m_cla");
+    return -1;
+  }
   return 0;
 }
 
@@ -447,7 +524,7 @@ BundleProtocol::RetreiveBundle ()
   //if (m_bpRxBufferPacket->GetSize () > 180)
   // ACS end
   // AlexK start
-  NS_LOG_DEBUG (this << " Received packet of size: " << m_bpRxBufferPacket->GetSize ());
+  NS_LOG_FUNCTION (this << " Received packet of size: " << m_bpRxBufferPacket->GetSize ());
   int rand_val = 180;
   if (m_bpRxBufferPacket->GetSize () > rand_val)
   // Alexk end
@@ -455,21 +532,12 @@ BundleProtocol::RetreiveBundle ()
       // since BpHeader's length is a variable, we must also read data buffer size to guarantee that the node 
       // receives a complete primary bundle header and bundle payload header
 
-      // copy m_bpRxBufferPacket into a Buffer
       uint32_t size = m_bpRxBufferPacket->GetSize();
-      uint8_t *buffer = (uint8_t*)std::malloc(size);
-
-      m_bpRxBufferPacket->CopyData (buffer, size); 
-
-      Buffer buf;
-      buf.AddAtStart (size);
-      Buffer::Iterator start = buf.Begin ();
-      start.Write (buffer, size);
  
       // if there is not data, we cannot call PeekHeader, since we cannot guarantee a complete primary bundle header and 
       // bundle header is received
 
-      if (buf.GetSize () == 0 ){
+      if (size == 0 ){
         NS_LOG_DEBUG (this << " Received buffer was size 0. Returning");
         return;
       }
@@ -542,11 +610,10 @@ BundleProtocol::ProcessBundle (Ptr<Packet> bundle)
                               " packet size " << bundle->GetSize ());
 
   // the destination endpoint eid is registered? 
-  // TBD: forwarding case
-  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.end ();
-  it = BpRegistration.find (dst);
+  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.find (dst);
   if (it == BpRegistration.end ())
     {
+      NS_LOG_FUNCTION ("Attempting to process bundle for eid: " << dst.Uri() << " which is not registered with current registration.  Dropping");
       // the destination endpoint id is not registered, drop packet
       return;
     } 
@@ -554,6 +621,93 @@ BundleProtocol::ProcessBundle (Ptr<Packet> bundle)
     {
       // TBD: the lifetime of the eid is expired?
     }
+  if (dst != this->m_eid)
+  {
+    // destination is registered and not the current node, so forwarding
+    NS_LOG_FUNCTION ("Received bundle for eid: " << dst.Uri() << ". Current eid is: " << this->m_eid.Uri() << ". Forwarding bundle");
+    if (ForwardBundle(bundle) < 0)
+    {
+      NS_LOG_FUNCTION ("Forwarding of bundle to eid: " << dst.Uri() << " failed.  Bundle dropped");
+    }
+    return;
+  }
+  // check if this is part of a fragment
+  if (bpHeader.IsFragment ()){
+    // store all needed data from headers before we strip from them from fragments
+    time_t CreateTimeStamp = bpHeader.GetCreateTimestamp ();
+    std::string FragName = src.Uri () + "_" + std::to_string(CreateTimeStamp);
+    u_int32_t AduLength = bpHeader.GetAduLength ();
+    
+    NS_LOG_FUNCTION (this << "Bundle is part of fragment: timestamp=" << CreateTimeStamp <<
+                              "total ADU length: " << AduLength <<
+                              "seq=" << bpHeader.GetSequenceNumber ().GetValue () <<
+                              " offset=" << bpHeader.GetFragOffset ()); 
+    
+    // is this the first fragment of the bundle we've received?
+    std::map<std::string, std::map<u_int32_t, Ptr<Packet> > >::iterator itBpFrag = BpRecvFragMap.find (FragName);
+    if (itBpFrag == BpRecvFragMap.end ())
+    {
+      // this is the first fragment of this bundle received
+      NS_LOG_FUNCTION (this << " First fragment for bundle: " << FragName);
+      std::map<u_int32_t, Ptr<Packet> > FragMap;
+      FragMap.insert (std::pair<u_int32_t, Ptr<Packet> > (bpHeader.GetSequenceNumber ().GetValue (), bundle));
+      BpRecvFragMap.insert (std::pair<std::string, std::map<u_int32_t, Ptr<Packet> > > (FragName, FragMap));
+    }
+    else
+    {
+      // some bundle fragments already received
+      u_int32_t fragSeqNum = bpHeader.GetSequenceNumber ().GetValue ();
+      NS_LOG_FUNCTION (this << " Already have some fragments, adding sequence number: " << fragSeqNum);
+      std::map<u_int32_t, Ptr<Packet> >::iterator itFrag = (*itBpFrag).second.find(fragSeqNum);
+      if (itFrag != (*itBpFrag).second.end ())
+      {
+        NS_LOG_FUNCTION (this << " Bundle fragment already received. Dropping");
+        return;
+      }
+      (*itBpFrag).second.insert (std::pair<u_int32_t, Ptr<Packet> > (bpHeader.GetSequenceNumber ().GetValue (), bundle));
+    }
+    // test if bundle is now complete
+    NS_LOG_FUNCTION (this << " Checking for complete bundle");
+    itBpFrag = BpRecvFragMap.find (FragName); // Retrieving the fragmentation map again in the event of a first fragment received
+    u_int32_t CurrentBundleLength = 0;
+    
+    for (auto& it : (*itBpFrag).second)
+    {
+      NS_LOG_FUNCTION (this << "inspecting fragment: " << it.second);
+      BpHeader fragBpHeader;
+      it.second->PeekHeader (fragBpHeader);
+      CurrentBundleLength += fragBpHeader.GetBlockLength ();
+      NS_LOG_FUNCTION (this << "CurrentBundleLength: " << CurrentBundleLength);
+    }
+    if (CurrentBundleLength != AduLength)
+    {
+      // we do not have the complete bundle. Return and wait for rest of bundle fragments to come in
+      NS_LOG_FUNCTION (this << " Have " << CurrentBundleLength << " out of " << AduLength << ". Waiting to receive rest");
+      return;
+    }
+    // bundle is complete
+    NS_LOG_FUNCTION (this << " Have complete bundle of size " << CurrentBundleLength);
+    // Get first fragment and start building from there;
+    u_int32_t FragSeqNum = 0;
+    std::map<u_int32_t, Ptr<Packet> >::iterator itFrag = (*itBpFrag).second.find(FragSeqNum);
+    bundle = (*itFrag).second;
+    bundle->PeekHeader (bpHeader);
+    CurrentBundleLength = bpHeader.GetBlockLength ();
+    FragSeqNum++;
+    for (; CurrentBundleLength < AduLength; FragSeqNum++)
+    {
+      itFrag = (*itBpFrag).second.find(FragSeqNum);
+      Ptr<Packet> bundleFragment = (*itFrag).second;
+      bundleFragment->PeekHeader (bpHeader);
+      CurrentBundleLength += bpHeader.GetBlockLength ();
+      // strip fragment headers
+      bundleFragment->RemoveHeader (bpHeader);
+      bundleFragment->RemoveHeader (bppHeader);
+      bundle->AddAtEnd(bundleFragment);
+    }
+    // Now have reconstructed packet, delete fragment map
+    BpRecvFragMap.erase (FragName);
+  }
 
   // store the bundle into persistant received storage
   std::map<BpEndpointId, std::queue<Ptr<Packet> > >::iterator itMap = BpRecvBundleStore.end ();
@@ -579,8 +733,7 @@ BundleProtocol::Receive (const BpEndpointId &eid)
   NS_LOG_FUNCTION (this << " " << eid.Uri ());
   Ptr<Packet> emptyPacket = NULL;
 
-  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.end ();
-  it = BpRegistration.find (eid);
+  std::map<BpEndpointId, BpRegisterInfo>::iterator it = BpRegistration.find (eid);
   if (it == BpRegistration.end ())
     {
       // the eid is not registered
@@ -656,17 +809,19 @@ Ptr<Packet>
 BundleProtocol::GetBundle (const BpEndpointId &src)
 { 
   NS_LOG_FUNCTION (this << " " << src.Uri ());
-  std::map<BpEndpointId, std::queue<Ptr<Packet> > >::iterator it = BpSendBundleStore.end ();
-  it = BpSendBundleStore.find (src);
+  std::map<BpEndpointId, std::queue<Ptr<Packet> > >::iterator it = BpSendBundleStore.find (src); 
   if ( it == BpSendBundleStore.end ())
     {
+      NS_LOG_FUNCTION (this << " Did not find bundle in SendBundleStore with uri: " << src.Uri ());
       return NULL;
     }
   else
     {
       if ( ((*it).second).size () == 0)
+      {
+        NS_LOG_FUNCTION (this << " Found queue SendBundleStore for uri: " << src.Uri () << " but is empty");
         return NULL;
-
+      }
       Ptr<Packet> packet = ((*it).second).front ();
       ((*it).second).pop ();
 

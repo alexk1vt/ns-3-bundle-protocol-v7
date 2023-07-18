@@ -6,3 +6,9 @@ def build(bld):
 
     obj = bld.create_ns3_program('bundle-protocol-nocla', ['bundle-protocol', 'point-to-point'])
     obj.source = 'bundle-protocol-nocla.cc'
+        
+    obj = bld.create_ns3_program('bundle-protocol-multihop-tcp', ['bundle-protocol', 'point-to-point'])
+    obj.source = 'bundle-protocol-multihop-tcp.cc'
+    
+    obj = bld.create_ns3_program('bundle-protocol-multihop-linkstatuschange-tcp', ['bundle-protocol', 'point-to-point'])
+    obj.source = 'bundle-protocol-multihop-linkstatuschange-tcp.cc'

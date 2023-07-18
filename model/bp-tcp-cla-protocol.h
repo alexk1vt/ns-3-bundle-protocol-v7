@@ -100,6 +100,9 @@ public:
    */
   virtual Ptr<Socket> GetL4Socket (Ptr<Packet> packet);
 
+  
+  virtual bool RemoveL4Socket (Ptr<Socket> socket);
+
   /**
    * Connect to routing protocol
    *
@@ -175,6 +178,10 @@ public:
    */
   void DataRecv (Ptr<Socket> socket);
 
+  virtual int setL4Address (BpEndpointId eid, InetSocketAddress l4Address);
+
+  virtual InetSocketAddress getL4Address (BpEndpointId eid);
+
 private:
 
   /**
@@ -184,11 +191,32 @@ private:
    */
   virtual void SetL4SocketCallbacks (Ptr<Socket> socket);
 
+  virtual void SetL4SocketStatus (Ptr<Socket> socket, u_int16_t status);
+  virtual u_int16_t GetL4SocketStatus (Ptr<Socket> socket);
+  virtual InetSocketAddress GetSendSocketAddress(Ptr<Socket> socket);
+  virtual void SetSendSocketAddress(Ptr<Socket> socket, InetSocketAddress address);
+
+  virtual void m_send (Ptr<Socket> socket);
+  virtual bool SocketAddressSendQueueEmpty (InetSocketAddress address);
+
+  //virtual void ResendPacket (Ptr<Packet> packet);
+
+  virtual void RetrySocketConn (Ptr<Packet> packet);
+
 private:
   Ptr<BundleProtocol> m_bp;                             /// bundle protocol
   std::map<BpEndpointId, Ptr<Socket> > m_l4SendSockets; /// the transport layer sender sockets
   std::map<BpEndpointId, Ptr<Socket> > m_l4RecvSockets; /// the transport layer receiver sockets
-
+  std::map<BpEndpointId, InetSocketAddress> m_l4Addresses; /// the registered node socket addresses
+  std::map<Ptr<Socket>, u_int16_t> m_l4SocketStatus; // the status of registered sockets:  ok to send _only_ when status is 0
+                                                    // 0 - New connection created, ok to send
+                                                    // 1 - Connection request sent, waiting for response
+                                                    // 2 - Connection attempt failed, not ok to send
+                                                    // 3 - Connection closed normally
+                                                    // 4 - Connection closed by error
+                                                    // 5 - No status
+  std::map<Ptr<Socket>, InetSocketAddress> m_SendSocketL4Addresses; // map of destination addresses to corresponding sockets (since you cant query sockets for the remote address they are connected to)
+  std::map<InetSocketAddress, std::queue<Ptr<Packet> > > SocketAddressSendQueue; // storage of packets going to a particular L4 address while waiting for TCP sessions to be built
   Ptr<BpRoutingProtocol> m_bpRouting;                   /// bundle routing protocol
 };
 

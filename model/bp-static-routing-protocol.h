@@ -22,7 +22,7 @@
 
 #include "bp-routing-protocol.h"
 #include "bundle-protocol.h"
-#include "ns3/inet-socket-address.h"
+//#include "ns3/inet-socket-address.h"  // -- Bundle protocol doesn't worry about lower layers
 
 namespace ns3 {
 
@@ -55,16 +55,16 @@ public:
   /**
    * \brief Add a static route 
    */
-  virtual int AddRoute (BpEndpointId eid, InetSocketAddress address);
+  virtual int AddRoute (BpEndpointId eid, BpEndpointId next_hop);
 
   /**
    *  \return the internet socket address of matched eid; If there is no 
    *  match route, return the 127.0.0.1 with port 0
    */
-  virtual InetSocketAddress GetRoute (BpEndpointId eid);
+  virtual BpEndpointId GetRoute (BpEndpointId eid);
 
 private:
-  std::map <BpEndpointId, InetSocketAddress> m_routeMap; /// routing table
+  std::map <BpEndpointId, BpEndpointId> m_routeMap; /// routing table
   Ptr<BundleProtocol> m_bp;                              /// bundle protocol
 };
 
