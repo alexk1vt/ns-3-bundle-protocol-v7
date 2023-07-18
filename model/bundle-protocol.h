@@ -16,6 +16,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: Dizhi Zhou <dizhi.zhou@gmail.com>
+ * 
+ * * BP-7 Author: Alexander Kedrowitsch <alexk1@vt.edu>
+ * 
  */
 #ifndef BUNDLE_PROTOCOL_H
 #define BUNDLE_PROTOCOL_H
@@ -23,6 +26,7 @@
 #include "bp-cla-protocol.h"
 #include "bp-endpoint-id.h"
 #include "bp-routing-protocol.h"
+#include "bp-bundle.h"
 #include "ns3/sequence-number.h"
 #include "ns3/object.h"
 #include "ns3/event-id.h"
@@ -175,19 +179,29 @@ public:
    * \return returns -1 if the source endpoint id is not registered. Otherwise, it 
    * returns 0.
    */
-  virtual int Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst);
+  //virtual int Send (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst);
 
   /* Function to provide a file path - File will be read, possibly fragmented, and sent to destination EID
   * Receiving end will still call Receive(..) and receive packets as they come in.  It's up to them on what they do with the data (save as file, etc...).
   * Will need to ensure bundle/packet sequencing is performed whereever the RFC requires
   */
-  virtual int Send_file (std::string file_path, const BpEndpointId &src, const BpEndpointId &dst);
+  //virtual int Send_file (std::string file_path, const BpEndpointId &src, const BpEndpointId &dst);
 
   /*
    * Ultimately going to replace existing 'Send(...)' function as it receives an
    * NS-3 packet of data and copies the contents into the bundle payload
   */
-  virtual int Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst);
+  //virtual int Send_packet (Ptr<Packet> p, const BpEndpointId &src, const BpEndpointId &dst);
+
+  /**
+   * \brief Send data from the given buffer as a data
+   * 
+   * \param data a pointer to the buffer of data to send
+   * \param size the size of the buffer
+   * \param src source endpoint id
+   * \param dst destination endpoint id
+  */
+  virtual int Send_data (const uint8_t* data, const uint32_t size, const BpEndpointId &src, const BpEndpointId &dst);
 
   /**
    * Remove the registration with the eid and close the transport layer connection
@@ -196,7 +210,7 @@ public:
    */
   virtual int Close (const BpEndpointId &eid);  
 
-  int ForwardBundle (Ptr<Packet> bundle);
+  int ForwardBundle (Ptr<BpBundle> bundle);
 
   /**
    *  \brief Receive bundle with dst eid
@@ -208,7 +222,15 @@ public:
    *
    *  \return the bundle payload
    */
-  virtual Ptr<Packet> Receive (const BpEndpointId &eid);
+  virtual Ptr<BpBundle> Receive (const BpEndpointId &eid);
+  //virtual Ptr<Packet> Receive (const BpEndpointId &eid);
+
+  /**
+   * \brief Receive data from the specified eid
+   * 
+   * \return the data payload
+   */
+  std::vector<uint8_t> Receive_data (const BpEndpointId &eid);
 
   // interfaces to convergence layer (CLA)
 
@@ -230,7 +252,17 @@ public:
    *
    * \return the bundle with the source endpoint id
    */
-  virtual Ptr<Packet> GetBundle (const BpEndpointId &src);
+  virtual Ptr<BpBundle> GetBundle (const BpEndpointId &src);
+  //virtual Ptr<Packet> GetBundle (const BpEndpointId &src);
+
+  /**
+   * Get and delete a bundle from persistant storage
+   * 
+   * \param src the source endpoint id
+   * 
+   * \return the bundle (as a BpBundle) with the source endpoint id
+  */
+  BpBundle GetBpBundle (const BpEndpointId &src);
 
   /**
    * Get node of this bundle protocol
@@ -297,7 +329,8 @@ private:
    *
    * \param bundle from CLA layer
    */
-  void ProcessBundle (Ptr<Packet> bundle);
+  void ProcessBundle (Ptr<BpBundle> bundle);
+  //void ProcessBundle (Ptr<Packet> bundle);
 
   /**
    * Retreive bundle from rx buffer
@@ -329,13 +362,17 @@ private:
   std::string m_l4Type;        /// the transport layer type
   std::string m_rtType;        /// the bundle routing protocol type
 
-  std::map<BpEndpointId, std::queue<Ptr<Packet> > > BpSendBundleStore; /// persistant storage of sent bundles: map (source endpoint id, bundle packet queue )
-  std::map<BpEndpointId, std::queue<Ptr<Packet> > > BpRecvBundleStore; /// persistant storage of received bundles: map (destination endpoint id, bundle packet queue )
+  //std::map<BpEndpointId, std::queue<Ptr<Packet> > > BpSendBundleStore; /// persistant storage of sent bundles: map (source endpoint id, bundle packet queue )
+  std::map<BpEndpointId, std::queue<Ptr<BpBundle> > > BpSendBundleStore; /// persistant storage of sent bundles: map (source endpoint id, bundle packet queue )
+  //std::map<BpEndpointId, std::queue<Ptr<Packet> > > BpRecvBundleStore; /// persistant storage of received bundles: map (destination endpoint id, bundle packet queue )
+  std::map<BpEndpointId, std::queue<Ptr<BpBundle > > >BpRecvBundleStore; /// persistant storage of received bundles: map (destination endpoint id, bundle packet queue )
   std::map<BpEndpointId, BpRegisterInfo> BpRegistration; /// persistant storage of registrations: map (local endpoint id, registration information)
 
-  std::map<std::string, std::map<u_int32_t, Ptr<Packet> > > BpRecvFragMap; /// mapping of partial bundle fragment buffers
+  //std::map<std::string, std::map<u_int32_t, Ptr<Packet> > > BpRecvFragMap; /// mapping of partial bundle fragment buffers
+  std::map<std::string, std::map<u_int32_t, Ptr<BpBundle> > > BpRecvFragMap; /// mapping of partial bundle fragment buffers
 
   Ptr<Packet> m_bpRxBufferPacket; /// a buffer for all packets received from the CLA; bundles are retreived from this buffer
+  //Ptr<BpBundle> m_bpRxBufferPacket; /// a buffer for all packets received from the CLA; bundles are retreived from this buffer
 
   SequenceNumber32 m_seq;         /// the bundle sequence number
 
