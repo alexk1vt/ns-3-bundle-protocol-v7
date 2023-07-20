@@ -104,8 +104,8 @@ BpLtpClaProtocol::SendBundle (Ptr<BpBundle> bundlePtr)
             return -1;
         }
         
-        //uint64_t redSize = bundle->GetCborEncodingSize ();  // set entire bundle as red part for now
-        uint64_t redSize = 0;
+        uint64_t redSize = bundle->GetCborEncodingSize ();  // set entire bundle as red part for now
+        //uint64_t redSize = 0;
         
         // store bundle pointer in Tx Session Map for later updating and tracking _prior_ to sending
         TxMapVals txMapVals;
@@ -170,6 +170,8 @@ BpLtpClaProtocol::StartTransmission (Ptr<BpBundle> bundle, BpEndpointId nextHopE
     BpEndpointId internalEid = m_bp->GetBpEndpointId ();
     uint32_t cborSize = bundle->GetCborEncodingSize ();
     std::vector <uint8_t> cborEncoding = bundle->GetCborEncoding ();
+    //uint8_t* heapBuffer = new uint8_t[cborSize];
+    //std::copy(cborEncoding.begin(), cborEncoding.end(), heapBuffer);
     //std::vector <uint8_t> cborEncoding (cborSize, 65); // Red segment works for a vector of just '65s' but not for a vector of actual data...
     
     uint64_t ClientServiceId = 1; // 1 - bundle protocol
@@ -177,6 +179,7 @@ BpLtpClaProtocol::StartTransmission (Ptr<BpBundle> bundle, BpEndpointId nextHopE
     DecrementTxCnt();
     NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Sending packet sent from eid: " << internalEid.Uri () << " to nextHopEid: " << nextHopEid.Uri () << " with nextHopEngineId: " << nextHopEngineId << " of size " << cborEncoding.size() << " bytes immediately");
     m_ltp -> StartTransmission (ClientServiceId, ClientServiceId, nextHopEngineId, cborEncoding, redSize);
+    //m_ltp -> StartTransmission (ClientServiceId, ClientServiceId, nextHopEngineId, heapBuffer, redSize);
 }
 
 int

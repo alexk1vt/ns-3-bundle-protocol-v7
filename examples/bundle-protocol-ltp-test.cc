@@ -107,7 +107,7 @@ main (int argc, char *argv[])
   NS_LOG_INFO ("Create channels.");
 
   std::ostringstream channelDelay;
-  channelDelay << "5s";
+  channelDelay << "5ms";
 
   PointToPointHelper pointToPoint;
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("500Kbps"));
