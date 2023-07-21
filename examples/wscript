@@ -21,3 +21,6 @@ def build(bld):
     
     obj = bld.create_ns3_program('bundle-protocol-ltp-test', ['ltp-protocol', 'bundle-protocol', 'point-to-point'])
     obj.source = 'bundle-protocol-ltp-test.cc'
+
+    obj = bld.create_ns3_program('bundle-protocol-multinode-ltp', ['ltp-protocol', 'bundle-protocol', 'point-to-point'])
+    obj.source = 'bundle-protocol-multinode-ltp.cc'

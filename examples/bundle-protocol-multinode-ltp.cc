@@ -49,7 +49,7 @@
 using namespace ns3;
 //using namespace ltp;
 
-NS_LOG_COMPONENT_DEFINE ("BundleProtocolLtpSimple");
+NS_LOG_COMPONENT_DEFINE ("BundleProtocolMultinodeLtp");
 
 void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, BpEndpointId dst)
 {

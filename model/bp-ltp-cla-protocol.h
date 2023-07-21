@@ -100,6 +100,8 @@ private:
     void NotificationCallback (ns3::ltp::SessionId id, ns3::ltp::StatusNotificationCode code, std::vector<uint8_t> data, uint32_t dataLength, bool endFlag, uint64_t srcLtpEngine, uint32_t offset);
 
     void StartTransmission (Ptr<BpBundle> bundle, BpEndpointId nextHopEid, uint64_t nextHopEngineId, uint64_t redSize);
+    void AddBundleToTxQueue (std::vector<uint8_t> cborBundle, uint64_t dstLtpEngineId, uint64_t redSize);
+    void SendBundleFromTxQueue (void);
 
     void IncrementTxCnt (void);
     void DecrementTxCnt (void);
@@ -113,6 +115,12 @@ private:
         uint64_t srcLtpEngineId;
         uint64_t dstLtpEngineId;
         bool set;
+    };
+
+    struct TxQueueVals {
+        uint64_t redSize;
+        uint64_t dstLtpEngineId;
+        std::vector<uint8_t> cborBundle;
     };
 
     struct RcvMapVals {
@@ -136,6 +144,7 @@ private:
     std::map<Ptr<BpBundle>, TxMapVals> m_txSessionMap;            // Map of ongoing Tx sessions
     std::map<ns3::ltp::SessionId, RcvMapVals> m_rcvSessionMap;     // Map of ongoing Rx sessions
     uint32_t m_txCnt;                                            // Counter of all transmissions attempted in current time instance
+    std::queue<TxQueueVals> m_txQueue;                           // Queue of bundles to be transmitted
 };
 
 } // namespace ns3

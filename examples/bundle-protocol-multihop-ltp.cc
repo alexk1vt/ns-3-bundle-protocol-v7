@@ -159,21 +159,23 @@ main (int argc, char *argv[])
   //ltpHelper.SetStartTransmissionTime (Seconds (1));
   
   ltpHelper.InstallAndLink (nodes);
-  
+
   // get node L4 addresses
   uint64_t senderL4addr = link1_nodes.Get (0)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
   uint64_t forwarderL4addr_link1 = link1_nodes.Get (1)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
   uint64_t forwarderL4addr_link2 = link2_nodes.Get (0)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
   uint64_t recvL4addr = link2_nodes.Get (1)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
-
   // ltpHelper sets remote peers in round-robin fashion
+  // So, need to have forwarder linked back to sender and receiver linked back to forwarder
+  ltpHelper.Link (link1_nodes.Get (1), senderL4addr);
+  ltpHelper.Link (link2_nodes.Get (1), forwarderL4addr_link2);
 
   // Callback registration will occur within the bundle protocol CLA initiatization
   // Configure the BP nodes for LTP
   std::ostringstream l4type;
   l4type << "Ltp";
   Config::SetDefault ("ns3::BundleProtocol::L4Type", StringValue (l4type.str ()));
-  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (1000));  // set bundle fragmentation size to 400 bytes
+  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (400));  // set bundle fragmentation size to 400 bytes
 
   // build endpoint ids
   BpEndpointId eidSender ("dtn", "node0");
@@ -198,7 +200,7 @@ main (int argc, char *argv[])
   bpSenderHelper.SetBpEndpointId (eidSender);
   BundleProtocolContainer bpSenders = bpSenderHelper.Install (link1_nodes.Get (0));
   bpSenders.Start (Seconds (0.2));
-  bpSenders.Stop (Seconds (1.0));
+  bpSenders.Stop (Seconds (10.0));
 
   // forwarder
   BundleProtocolHelper bpForwarderHelper;
@@ -207,7 +209,7 @@ main (int argc, char *argv[])
   bpForwarderHelper.SetBpEndpointId (eidForwarder);
   BundleProtocolContainer bpForwarders = bpForwarderHelper.Install (link1_nodes.Get (1));
   bpForwarders.Start (Seconds (0.1));
-  bpForwarders.Stop (Seconds (1.0));
+  bpForwarders.Stop (Seconds (10.0));
 
   // receiver
   BundleProtocolHelper bpReceiverHelper;
@@ -216,7 +218,7 @@ main (int argc, char *argv[])
   bpReceiverHelper.SetBpEndpointId (eidRecv);
   BundleProtocolContainer bpReceivers = bpReceiverHelper.Install (link2_nodes.Get (1));
   bpReceivers.Start (Seconds (0.0));
-  bpReceivers.Stop (Seconds (1.0));
+  bpReceivers.Stop (Seconds (10.0));
 
   // register external nodes with each node
   Simulator::Schedule (Seconds (0.0), &Register, bpSenders.Get (0), eidForwarder, forwarderL4addr_link1);
@@ -234,8 +236,7 @@ main (int argc, char *argv[])
                 "to say the most of them, are, taken as a mass, at least one long step removed from "
                 "honest men. I say this with the greater freedom because, being a politician myself, "
                 "none can regard it as personal.";
-  */
-  
+  */  
   char data[] = "The Senate of the United States shall be composed of two Senators from each State, "
                 "chosen by the Legislature thereof, for six Years; and each Senator shall have one Vote."
                 "Immediately after they shall be assembled in Consequence of the first Election, they shall"
@@ -266,7 +267,7 @@ main (int argc, char *argv[])
   Simulator::Schedule (Seconds (0.3), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);  
 
   // receive function
-  Simulator::Schedule (Seconds (0.8), &Receive_char_array, bpReceivers.Get (0), eidRecv);
+  Simulator::Schedule (Seconds (8), &Receive_char_array, bpReceivers.Get (0), eidRecv);
   if (false)
     {
       AsciiTraceHelper ascii;
@@ -275,7 +276,7 @@ main (int argc, char *argv[])
     }
 
   NS_LOG_INFO ("Run Simulation.");
-  Simulator::Stop (Seconds (1.0));
+  Simulator::Stop (Seconds (10.0));
   Simulator::Run ();
   Simulator::Destroy ();
   NS_LOG_INFO ("Done.");

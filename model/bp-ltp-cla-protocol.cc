@@ -104,7 +104,7 @@ BpLtpClaProtocol::SendBundle (Ptr<BpBundle> bundlePtr)
             return -1;
         }
         
-        uint64_t redSize = bundle->GetCborEncodingSize ();  // set entire bundle as red part for now
+        uint64_t redSize = bundle->GetCborEncodingSize ()/2;  // set entire bundle as red part for now
         //uint64_t redSize = 0;
         
         // store bundle pointer in Tx Session Map for later updating and tracking _prior_ to sending
@@ -126,12 +126,8 @@ BpLtpClaProtocol::SendBundle (Ptr<BpBundle> bundlePtr)
             return -1;
         }
 
-        //NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Sending packet sent from eid: " << src.Uri () << " to nextHopEid: " << nextHopEid.Uri () << " with nextHopEngineId: " << nextHopEngineId << " immediately");
-        //m_ltp -> StartTransmission (ClientServiceId, ClientServiceId, nextHopEngineId, cborEncoding, redSize);
-        float_t txDelay = GetTxCnt() * (m_ltp->GetOneWayLightTime().GetSeconds() * 5);
-        NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Sending bundle from eid: " << src.Uri () << " to nextHopEid: " << nextHopEid.Uri () << " with nextHopEngineId: " << nextHopEngineId << " in " << txDelay << " seconds");
-        Simulator::Schedule (Seconds (txDelay), &BpLtpClaProtocol::StartTransmission, this, bundle, nextHopEid, nextHopEngineId, redSize);
-        IncrementTxCnt();
+        NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Queuing bundle from eid: " << src.Uri () << " to nextHopEid: " << nextHopEid.Uri () << " with nextHopEngineId: " << nextHopEngineId << " to send.");
+        AddBundleToTxQueue (bundle->GetCborEncoding (), nextHopEngineId, redSize);
         return 0;
     }
     NS_LOG_FUNCTION (this << " Unable to get bundle for eid: " << src.Uri ());
@@ -176,10 +172,41 @@ BpLtpClaProtocol::StartTransmission (Ptr<BpBundle> bundle, BpEndpointId nextHopE
     
     uint64_t ClientServiceId = 1; // 1 - bundle protocol
 
-    DecrementTxCnt();
     NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Sending packet sent from eid: " << internalEid.Uri () << " to nextHopEid: " << nextHopEid.Uri () << " with nextHopEngineId: " << nextHopEngineId << " of size " << cborEncoding.size() << " bytes immediately");
     m_ltp -> StartTransmission (ClientServiceId, ClientServiceId, nextHopEngineId, cborEncoding, redSize);
     //m_ltp -> StartTransmission (ClientServiceId, ClientServiceId, nextHopEngineId, heapBuffer, redSize);
+}
+
+void
+BpLtpClaProtocol::AddBundleToTxQueue (std::vector<uint8_t> cborBundle, uint64_t dstLtpEngineId, uint64_t redSize)
+{
+    NS_LOG_FUNCTION (this << " dstLtpEngineId: " << dstLtpEngineId << " redSize: " << redSize);
+    TxQueueVals txQueueVals;
+    txQueueVals.redSize = redSize;
+    txQueueVals.dstLtpEngineId = dstLtpEngineId;
+    txQueueVals.cborBundle = cborBundle;
+    m_txQueue.push (txQueueVals);
+
+    if (m_txQueue.size () == 1)
+    {
+        NS_LOG_FUNCTION (this << " TxQueueVals size is 1, sending immediately");
+        //Simulator::ScheduleNow (&BpLtpClaProtocol::SendBundleFromTxQueue, this);
+        SendBundleFromTxQueue ();
+    }
+}
+
+void
+BpLtpClaProtocol::SendBundleFromTxQueue (void)
+{
+    NS_LOG_FUNCTION (this);
+    if (m_txQueue.size () > 0)
+    {
+        TxQueueVals txQueueVals = m_txQueue.front ();
+        //m_txQueue.pop (); // -- don't pop this off until after the Tx is complete
+        uint64_t ClientServiceId = 1; // 1 - bundle protocol
+        NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Sending bundle from txQueue to " << txQueueVals.dstLtpEngineId << " with redSize of " << txQueueVals.redSize << " immediately");
+        m_ltp -> StartTransmission (ClientServiceId, ClientServiceId, txQueueVals.dstLtpEngineId, txQueueVals.cborBundle, txQueueVals.redSize);
+    }
 }
 
 int
@@ -385,7 +412,7 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
                                         uint32_t offset)
 {
     //NS_LOG_FUNCTION (this << " NotificationCallback called with arguments: " << id << code << dataLength << endFlag << srcLtpEngine << offset);
-    NS_LOG_FUNCTION (this << " Internal Engine ID " << m_LtpEngineId << " received NotificationCallback:");
+    NS_LOG_FUNCTION (this << " Internal Engine ID " << m_LtpEngineId << " received NotificationCallback with code " << code << " :");
     // Implement this
     // This will be called when data is received, a transmission status is updated, or when a session is closed
     // Need to check if the data is a bundle or a status update
@@ -399,7 +426,7 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
     //   SESSION_END
     if (code == ns3::ltp::SESSION_START) // Sender receives noficiation that session has started
     {
-        NS_LOG_FUNCTION (this << " Sender notified LTP session started. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id.GetSessionNumber ());
+        NS_LOG_FUNCTION (this << " Sender notified LTP session started. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id.GetSessionNumber () << " End flag: " << endFlag );
         //NS_LOG_FUNCTION (this << " Sender received notification that session " << id.GetSessionNumber () << " has started.  Record session information for later reference.");
         // Queue to generate new session for tracking.  What info should I keep?
         // Will need to iterate through m_txSessionMap, looking for an entry without a SessionId with a matching srcLtpEngineId
@@ -413,7 +440,7 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
                 it->second.status = code;
                 it->second.set = true; // indicate this is an entry with a matching SessionId
                 NS_LOG_FUNCTION (this << " Session " << id.GetSessionNumber () << " has started.  Session information recorded for later reference.");
-                return;
+                break;
             }
         }
         if (it == m_txSessionMap.end ())
@@ -423,10 +450,9 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
             {
                 NS_LOG_ERROR ("  " << this << "  Engine Id:" << it->second.srcLtpEngineId);
             }
-            return;
         }
     }
-    else if (code == ns3::ltp::GP_SEGMENT_RCV)
+    if (code == ns3::ltp::GP_SEGMENT_RCV)
     {
         NS_LOG_FUNCTION (this << " Receiver informed a Green Segment has been received. Internal engine ID: " << m_LtpEngineId << " Session Id: " << id.GetSessionNumber () << "; Data offset: " << offset << "; Segment length: " << dataLength << "; End flag: " << endFlag);
         std::map<ns3::ltp::SessionId, RcvMapVals>::iterator it = m_rcvSessionMap.find (id);
@@ -436,10 +462,12 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
             RcvMapVals temp;
             temp.srcLtpEngineId = srcLtpEngine;
             temp.status = code;
-            temp.greenData.resize(dataLength + offset);
-            std::copy(data.begin(), data.end(), temp.greenData.begin() + offset); // I'm assuming first green data received could have an offset
-            temp.rcvGreenDataLength = dataLength;
-            NS_LOG_FUNCTION (this << "temp.greenData.size() = " << temp.greenData.size() << " / temp.rcvGreenDataLength = " << temp.rcvGreenDataLength);
+            for ( std::vector<uint8_t>::const_iterator i = data.begin(); i != data.end(); ++i)
+            {
+                temp.greenData.push_back(*i);
+            }
+            temp.rcvGreenDataLength = temp.greenData.size ();
+            NS_LOG_FUNCTION (this << "temp.greenData.size() = " << temp.greenData.size() << "; declared size: " << dataLength);
             temp.rcvRedDataLength = 0;  // indicate no red data received yet
             m_rcvSessionMap.insert(std::pair<ns3::ltp::SessionId, RcvMapVals>(id, temp));
         }
@@ -447,16 +475,15 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
         {
             NS_LOG_FUNCTION (this << " Subsequent Green Part entry for SessionId " << id.GetSessionNumber () );
             it->second.status = code;
-            if (it->second.greenData.size() < it->second.rcvGreenDataLength + dataLength)
+            for ( std::vector<uint8_t>::const_iterator i = data.begin (); i != data.end (); ++i)
             {
-                it->second.greenData.resize(it->second.greenData.size() + dataLength);
+                it->second.greenData.push_back(*i);
             }
-            std::copy(data.begin(), data.end(), it->second.greenData.begin() + offset); // I'm assuming first green data received could have an offset
-            it->second.rcvGreenDataLength += dataLength;
-            it->second.status = code;
+            it->second.rcvGreenDataLength = it->second.greenData.size ();
+            NS_LOG_FUNCTION (this << "it->second.greenData.size() = " << it->second.greenData.size() << "; declared size: " << dataLength);
         }
     }
-    else if (code == ns3::ltp::RED_PART_RCV)
+    if (code == ns3::ltp::RED_PART_RCV)
     {
         NS_LOG_FUNCTION (this << " Receiver informed a Red Part has been received. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id.GetSessionNumber () << " Received << " << dataLength << " bytes");// << " Source LTP Engine ID: " << srcLtpEngine << " Segment Length: " << dataLength << " End Flag: " << endFlag);
         std::map<ns3::ltp::SessionId, RcvMapVals>::iterator it = m_rcvSessionMap.find (id);
@@ -466,21 +493,29 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
             RcvMapVals temp;
             temp.srcLtpEngineId = srcLtpEngine;
             temp.status = code;
-            temp.redData.resize(dataLength);
-            std::copy(data.begin(), data.end(), temp.redData.begin());
-            temp.rcvRedDataLength = dataLength;
+            for ( std::vector<uint8_t>::const_iterator i = data.begin(); i != data.end(); ++i)
+            {
+                temp.redData.push_back(*i);
+            }
+            temp.rcvRedDataLength = temp.redData.size ();
             temp.rcvGreenDataLength = 0;  // indicate no green data received yet
             m_rcvSessionMap.insert(std::pair<ns3::ltp::SessionId, RcvMapVals>(id, temp));
         }
         else // Have received previous red parts for this session
         {
-            NS_LOG_FUNCTION (this << " Subsequent Red Part entry for SessionId " << id.GetSessionNumber () << "- Should not happen!");
+            NS_LOG_FUNCTION (this << " Subsequent Red Part entry for SessionId " << id.GetSessionNumber () << "- Should this happen?");
+            it->second.status = code;
+            for ( std::vector<uint8_t>::const_iterator i = data.begin (); i != data.end (); ++i)
+            {
+                it->second.redData.push_back(*i);
+            }
+            it->second.rcvRedDataLength = it->second.redData.size ();
+            NS_LOG_FUNCTION (this << "it->second.redData.size() = " << it->second.redData.size() << "; declared size: " << dataLength);
         }
     }
-    else if (code == ns3::ltp::SESSION_END)
+    if (code == ns3::ltp::SESSION_END)
     {
         NS_LOG_FUNCTION (this << " Informed Session Ended. Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id.GetSessionNumber () << " Source LTP Engine ID: " << srcLtpEngine);
-        
 
         std::map<Ptr<BpBundle>, TxMapVals>::iterator TxIt;
         for (TxIt = m_txSessionMap.begin (); TxIt != m_txSessionMap.end (); TxIt++)
@@ -488,7 +523,15 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
             if (TxIt->second.sessionId == id)
             {
                 TxIt->second.status = code;  // End of a transmission session.  Update status and return -- WHEN SHOULD THIS RECORD BE REMOVED? 
-                NS_LOG_FUNCTION(this << " Session ID: " << id.GetSessionNumber () << " status updated.  Transmission session closed.");
+                NS_LOG_FUNCTION(this << " Sender notified session ID: " << id.GetSessionNumber () << " status updated.  Transmission session closed.");
+                // Once Sender is informed existing Tx is complete, pop the tx record off m_txQueue and check if more are ready to send
+                m_txQueue.pop (); // -- pop the bundle off the queue now that the Tx is complete
+                uint32_t txQueueSize  = m_txQueue.size ();
+                if (txQueueSize > 0)
+                {
+                    NS_LOG_FUNCTION (this << txQueueSize << " bundles remaining to send, sending next bundle immediately");
+                    Simulator::ScheduleNow(&BpLtpClaProtocol::SendBundleFromTxQueue, this);
+                }
                 return;
             }
         }
@@ -503,43 +546,50 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
         }
         else
         {
-            NS_LOG_FUNCTION (this << "SessionId " << id.GetSessionNumber () << " found in m_rxSessionMap");
+            NS_LOG_FUNCTION (this << " SessionId " << id.GetSessionNumber () << " found in m_rxSessionMap");
             if (RcvIt->second.rcvRedDataLength == 0 && RcvIt->second.rcvGreenDataLength == 0)
             {
                 NS_LOG_DEBUG (this << "No Data Received for SessionId " << id.GetSessionNumber () << ". Erasing session from m_rxSessionMap and returning");
                 m_rcvSessionMap.erase(RcvIt);
-                return;
             }
-            // Assemble the bundle and send up to bundle protocol
-            std::vector <uint8_t> assembledData;
-            if (RcvIt->second.rcvRedDataLength > 0)
+            else
             {
-                NS_LOG_FUNCTION (this << "Red Data Received for SessionId " << id.GetSessionNumber () << " with length " << RcvIt->second.redData.size() << " bytes (declared size of " << RcvIt->second.rcvRedDataLength << " bytes)");
-                // Assemble the bundle and send up to bundle protoco
-                assembledData.resize (RcvIt->second.rcvRedDataLength);
-                std::copy(RcvIt->second.redData.begin(), RcvIt->second.redData.end(), assembledData.begin());
-            }
-            if (RcvIt->second.rcvGreenDataLength > 0)
-            {
-                NS_LOG_FUNCTION (this << "Green Data Received for SessionId " << id.GetSessionNumber () << " with length " << RcvIt->second.greenData.size() << " bytes (declared size of " << RcvIt->second.rcvGreenDataLength << " bytes)");
                 // Assemble the bundle and send up to bundle protocol
-                //std::vector <uint8_t> assembledData;
-                assembledData.resize (assembledData.size() + RcvIt->second.rcvGreenDataLength);
-                std::copy(RcvIt->second.greenData.begin(), RcvIt->second.greenData.end(), assembledData.begin() + RcvIt->second.rcvRedDataLength);
+                std::vector <uint8_t> assembledData;
+                if (RcvIt->second.rcvRedDataLength > 0)
+                {
+                    NS_LOG_FUNCTION (this << "Red Data Received for SessionId " << id.GetSessionNumber () << " with length " << RcvIt->second.redData.size() << " bytes (declared size of " << RcvIt->second.rcvRedDataLength << " bytes)");
+                    // Assemble the bundle and send up to bundle protocol
+                    for ( std::vector<uint8_t>::const_iterator i = RcvIt->second.redData.begin(); i != RcvIt->second.redData.end(); ++i)
+                    {
+                        assembledData.push_back(*i);
+                    }
+                }
+                if (RcvIt->second.rcvGreenDataLength > 0)
+                {
+                    NS_LOG_FUNCTION (this << "Green Data Received for SessionId " << id.GetSessionNumber () << " with length " << RcvIt->second.greenData.size() << " bytes (declared size of " << RcvIt->second.rcvGreenDataLength << " bytes)");
+                    // Assemble the bundle and send up to bundle protocol
+                    //std::vector <uint8_t> assembledData;
+                    for ( std::vector<uint8_t>::const_iterator i = RcvIt->second.greenData.begin(); i != RcvIt->second.greenData.end(); ++i)
+                    {
+                        assembledData.push_back(*i);
+                    }
+                }
+                if (assembledData.size() == 0)
+                {
+                    NS_LOG_DEBUG (this << " No Data Received for SessionId " << id.GetSessionNumber () << ". Erasing session from m_rxSessionMap and returning");
+                    m_rcvSessionMap.erase(RcvIt);
+                }
+                else
+                {
+                    NS_LOG_FUNCTION (this << " Receiver with engineID " << m_LtpEngineId << " passing CBOR bundle with" << assembledData.size() << " bytes to bundle protocol");
+                    m_bp->ReceiveCborVector (assembledData);
+                    m_rcvSessionMap.erase(RcvIt);
+                }
             }
-            if (assembledData.size() == 0)
-            {
-                NS_LOG_DEBUG (this << " No Data Received for SessionId " << id.GetSessionNumber () << ". Erasing session from m_rxSessionMap and returning");
-                m_rcvSessionMap.erase(RcvIt);
-                return;
-            }
-            NS_LOG_FUNCTION (this << " Receiver with engineID " << m_LtpEngineId << " passing CBOR bundle with" << assembledData.size() << " bytes to bundle protocol");
-            m_bp->ReceiveCborVector (assembledData);
-            m_rcvSessionMap.erase(RcvIt);
         }
-        
     }
-    else if (code == ns3::ltp::TX_COMPLETED)
+    if (code == ns3::ltp::TX_COMPLETED)
     {
         NS_LOG_FUNCTION (this << " Initial Session Transmission Completed.  Internal Engine ID: " << m_LtpEngineId << " Session ID: " << id.GetSessionNumber () << " Source LTP Engine ID: " << srcLtpEngine);
         
@@ -557,7 +607,7 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
         }
         else // Indicates the end of a receipt
         {
-            return;
+            NS_LOG_FUNCTION (this << " End of receipt of transmission for SessionId " << id.GetSessionNumber () << " received by receiver with engineID " << m_LtpEngineId);
         }
 
     }
