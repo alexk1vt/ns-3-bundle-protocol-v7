@@ -301,7 +301,6 @@ BpLtpClaProtocol::GetL4Address (BpEndpointId eid, InetSocketAddress returnType)
 int
 BpLtpClaProtocol::SetL4Address (BpEndpointId eid, const InetSocketAddress* l4Address)
 {
-    NS_LOG_FUNCTION (this << " " << eid. Uri () << " Not the correct method for Ltp!");
     //uint64_t ltpAddress = static_cast<uint64_t> (l4Address);
     const uint64_t* reinterpAddressPtr = reinterpret_cast<const uint64_t*> (l4Address);
     uint64_t ltpAddress = *reinterpAddressPtr;
