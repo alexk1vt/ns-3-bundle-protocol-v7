@@ -502,7 +502,7 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
         }
         else // Have received previous red parts for this session
         {
-            NS_LOG_FUNCTION (this << " Subsequent Red Part entry for SessionId " << id.GetSessionNumber () << "- Should this happen?");
+            NS_LOG_FUNCTION (this << " Red Part entry for existing SessionId " << id.GetSessionNumber () );
             it->second.status = code;
             for ( std::vector<uint8_t>::const_iterator i = data.begin (); i != data.end (); ++i)
             {

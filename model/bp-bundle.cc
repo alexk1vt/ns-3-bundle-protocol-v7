@@ -341,12 +341,19 @@ BpBundle::RebuildBundle ()
     this->GetCborEncoding ();
 }
 
-void
+int
 BpBundle::SetBundleFromCbor (std::vector <std::uint8_t> cborBundle)
 {
     NS_LOG_FUNCTION (this);
     //PrintCborBytes (cborBundle);
-    m_bundle = json::from_cbor(cborBundle);
+    try
+    {
+        m_bundle = json::from_cbor(cborBundle);
+    } catch (int exceptionValue) {
+        NS_LOG_FUNCTION ("  ::SetBundleFromCbor:: Unable to convert bundle from CBOR.  Exception caught: " << exceptionValue);
+        return -1;
+    }
+    
     m_retentionConstraint = m_bundle["retention_constraint"];
     m_primaryBlock.SetPrimaryBlockFromJson (m_bundle["primary_block"]);
     m_payloadBlock.SetCanonicalBlockFromJson (m_bundle["payload_block"]);
@@ -354,6 +361,7 @@ BpBundle::SetBundleFromCbor (std::vector <std::uint8_t> cborBundle)
     {
         m_extensionBlock.SetCanonicalBlockFromJson (m_bundle["extension_block"]); // TODO - implement support for multiple extension blocks
     }
+    return 0;
 }
 
 void

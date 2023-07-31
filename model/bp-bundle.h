@@ -130,7 +130,7 @@ public:
      * 
      * \param cborEncoding the bundle CBOR encoding
      */
-    void SetBundleFromCbor (const std::vector <std::uint8_t> cborEncoding);
+    int SetBundleFromCbor (const std::vector <std::uint8_t> cborEncoding);
     
 
   // Getters

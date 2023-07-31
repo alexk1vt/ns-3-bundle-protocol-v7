@@ -474,7 +474,12 @@ BundleProtocol::RetreiveBundle ()
       Ptr<BpBundle> bundle = CreateObject<BpBundle> ();
       std::vector <uint8_t> v_buffer = m_bpRxCborVectorQueue.front ();
       m_bpRxCborVectorQueue.pop ();
-      bundle->SetBundleFromCbor (v_buffer);
+      int retVal = bundle->SetBundleFromCbor (v_buffer);
+      if (retVal < 0)
+      {
+        NS_LOG_FUNCTION (this << " Error processing bundle.  Dropping");
+        return;
+      }
       ProcessBundle (bundle); // now process the bundle and perform follow-on actions
       Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this); // see if there are any additional bundles to process
    }
