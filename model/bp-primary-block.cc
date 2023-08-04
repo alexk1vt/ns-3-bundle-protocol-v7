@@ -39,6 +39,7 @@ namespace ns3 {
 /* Public */
 BpPrimaryBlock::BpPrimaryBlock ()
   : m_version (0x7),
+    m_blockNumber (0),
     m_processingFlags (0),
     m_creationTimestamp (0),
     m_lifetime (0),
@@ -59,6 +60,7 @@ BpPrimaryBlock::BpPrimaryBlock ()
 
     // build the json primary block - ordering is specified in RFC 9171 and remains consistent with the order of the primary block fields
     m_primary_bundle_block["version"] = m_version;
+    m_primary_bundle_block["block_number"] = m_blockNumber;
     m_primary_bundle_block["processing_flags"] = m_processingFlags;
     m_primary_bundle_block["crc_type"] = m_crcType;
     m_primary_bundle_block["destination"] = m_destEndpointId.Uri (); //.GetEidString ();
@@ -78,6 +80,7 @@ BpPrimaryBlock::BpPrimaryBlock ()
 
 BpPrimaryBlock::BpPrimaryBlock(BpEndpointId src, BpEndpointId dst, uint32_t payloadSize)
     : m_version (0x7),
+    m_blockNumber (0),
     m_processingFlags (0),
     m_creationTimestamp (0),
     m_lifetime (0),
@@ -95,6 +98,7 @@ BpPrimaryBlock::BpPrimaryBlock(BpEndpointId src, BpEndpointId dst, uint32_t payl
 
     // build the json primary block - ordering is specified in RFC 9171 and remains consistent with the order of the primary block fields
     m_primary_bundle_block["version"] = m_version;
+    m_primary_bundle_block["block_number"] = m_blockNumber;
     m_primary_bundle_block["processing_flags"] = m_processingFlags;
     m_primary_bundle_block["crc_type"] = m_crcType;
     m_primary_bundle_block["destination"] = m_destEndpointId.Uri (); //.GetEidString ();
@@ -120,6 +124,7 @@ BpPrimaryBlock::SetPrimaryBlockFromJson (json jsonPrimaryBlock)
     NS_LOG_FUNCTION (this << jsonPrimaryBlock.dump ());
     m_primary_bundle_block = jsonPrimaryBlock;
     m_version = m_primary_bundle_block["version"];
+    m_blockNumber = m_primary_bundle_block["block_number"];
     m_processingFlags = m_primary_bundle_block["processing_flags"];
     m_crcType = m_primary_bundle_block["crc_type"];
     BpEndpointId tempEid(m_primary_bundle_block["destination"]);
@@ -350,6 +355,7 @@ BpPrimaryBlock::RebuildBlock ()
     NS_LOG_FUNCTION (this);
     // rebuild the json primary block - ordering is specified in RFC 9171 and remains consistent with the order of the primary block fields
     m_primary_bundle_block["version"] = m_version;
+    m_primary_bundle_block["block_number"] = m_blockNumber;
     m_primary_bundle_block["processing_flags"] = m_processingFlags;
     m_primary_bundle_block["crc_type"] = m_crcType;
     m_primary_bundle_block["destination"] = m_destEndpointId.Uri (); //GetEidString ();

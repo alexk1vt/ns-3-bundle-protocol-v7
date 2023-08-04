@@ -429,7 +429,7 @@ BundleProtocol::Close (const BpEndpointId &eid)
 }
 
 void
-BundleProtocol::RetreiveBundle ()
+BundleProtocol::RetreiveCBORBundle ()
 { 
   NS_LOG_FUNCTION (this);
   /*
@@ -481,8 +481,21 @@ BundleProtocol::RetreiveBundle ()
         return;
       }
       ProcessBundle (bundle); // now process the bundle and perform follow-on actions
-      Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this); // see if there are any additional bundles to process
+      Simulator::ScheduleNow (&BundleProtocol::RetreiveCBORBundle, this); // see if there are any additional bundles to process
    }
+}
+
+void
+BundleProtocol::RetreiveBundle ()
+{
+  NS_LOG_FUNCTION (this);
+  if (!m_bpRxBundleQueue.empty ())
+  {
+    Ptr<BpBundle> bundle = m_bpRxBundleQueue.front ();
+    m_bpRxBundleQueue.pop ();
+    ProcessBundle (bundle); // now process the bundle and perform follow-on actions
+    Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this); // see if there are any additional bundles to process
+  }
 }
 
 void 
@@ -523,6 +536,14 @@ BundleProtocol::ReceiveCborVector (std::vector <uint8_t> v_bundle)
 { 
   NS_LOG_FUNCTION (this << " Received vector of " << v_bundle.size () << " bytes");
   m_bpRxCborVectorQueue.push (v_bundle);
+  Simulator::ScheduleNow (&BundleProtocol::RetreiveCBORBundle, this);
+}
+
+void
+BundleProtocol::ReceiveBundle (Ptr<BpBundle> bundle)
+{ 
+  NS_LOG_FUNCTION (this << " " << bundle);
+  m_bpRxBundleQueue.push (bundle);
   Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this);
 }
 

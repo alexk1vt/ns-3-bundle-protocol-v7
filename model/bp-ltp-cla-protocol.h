@@ -88,6 +88,16 @@ public:
     void SetL4Callbacks (void);
 
 
+  /*
+  * Red Data modes
+  */
+    typedef enum {
+        RED_DATA_NONE   = 0,
+        RED_DATA_SLIM   = 1,
+        RED_DATA_ROBUST = 2,
+        RED_DATA_ALL    = 3
+    } RedDataModes;
+
 private:
 
     /**
@@ -99,9 +109,16 @@ private:
 
     void NotificationCallback (ns3::ltp::SessionId id, ns3::ltp::StatusNotificationCode code, std::vector<uint8_t> data, uint32_t dataLength, bool endFlag, uint64_t srcLtpEngine, uint32_t offset);
 
+    void SetLinkStatusChangeCallback (void);
+    void LinkStatusChangeCallback(bool linkIsUp);
+
+    std::vector<uint8_t> SplitBundle (Ptr<BpBundle> bundle, RedDataModes redDataMode, uint64_t *redSize);
+    Ptr<BpBundle> AssembleBundle (std::vector<uint8_t> data, uint64_t redSize);
+
     void StartTransmission (Ptr<BpBundle> bundle, BpEndpointId nextHopEid, uint64_t nextHopEngineId, uint64_t redSize);
     void AddBundleToTxQueue (std::vector<uint8_t> cborBundle, uint64_t dstLtpEngineId, uint64_t redSize);
-    void SendBundleFromTxQueue (void);
+    void SendBundleFromTxQueue (uint64_t dstLtpEngineId);
+    void CheckForBundleToSendFromTxQueue(void);
 
     void IncrementTxCnt (void);
     void DecrementTxCnt (void);
@@ -121,6 +138,8 @@ private:
         uint64_t redSize;
         uint64_t dstLtpEngineId;
         std::vector<uint8_t> cborBundle;
+        bool waitingForAvailLink;
+
     };
 
     struct RcvMapVals {
@@ -144,7 +163,8 @@ private:
     std::map<Ptr<BpBundle>, TxMapVals> m_txSessionMap;            // Map of ongoing Tx sessions
     std::map<ns3::ltp::SessionId, RcvMapVals> m_rcvSessionMap;     // Map of ongoing Rx sessions
     uint32_t m_txCnt;                                            // Counter of all transmissions attempted in current time instance
-    std::queue<TxQueueVals> m_txQueue;                           // Queue of bundles to be transmitted
+    //std::queue<TxQueueVals> m_txQueue;                           // Queue of bundles to be transmitted
+    std::map<uint64_t, std::deque<TxQueueVals> > m_txQueueMap;    // Map of Tx queues for each LTP engine ID
 };
 
 } // namespace ns3

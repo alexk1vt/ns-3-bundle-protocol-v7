@@ -9,11 +9,12 @@
 #include "ns3/boolean.h"
 #include "ns3/object-vector.h"
 #include "ns3/packet.h"
+#include "ns3/ipv4.h"
+
 
 #include "ns3/node.h"
 #include "ns3/simulator.h"
 
-#include "ns3/config.h" // added by AlexK. to allow modifying default TCP values
 #include "ns3/uinteger.h"
 
 #include "bp-cla-protocol.h"
@@ -104,7 +105,7 @@ BpLtpClaProtocol::SendBundle (Ptr<BpBundle> bundlePtr)
             return -1;
         }
         
-        uint64_t redSize = bundle->GetCborEncodingSize ()/2;  // set entire bundle as red part for now
+        RedDataModes redDataMode = RED_DATA_SLIM; // Options are RED_DATA_NONE, RED_DATA_SLIM, RED_DATA_ROBUST, RED_DATA_ALL
         //uint64_t redSize = 0;
         
         // store bundle pointer in Tx Session Map for later updating and tracking _prior_ to sending
@@ -127,7 +128,23 @@ BpLtpClaProtocol::SendBundle (Ptr<BpBundle> bundlePtr)
         }
 
         NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Queuing bundle from eid: " << src.Uri () << " to nextHopEid: " << nextHopEid.Uri () << " with nextHopEngineId: " << nextHopEngineId << " to send.");
-        AddBundleToTxQueue (bundle->GetCborEncoding (), nextHopEngineId, redSize);
+        // if redDataMode == RED_DATA_SLIM or RED_DATA_ROBUST, need to split bundle into red/green parts
+        // if redDataMode == RED_DATA_NONE or RED_DATA_ALL, send entire bundle as either green or part
+        if (redDataMode == RED_DATA_NONE)
+        {
+            AddBundleToTxQueue (bundle->GetCborEncoding (), nextHopEngineId, 0);
+        }
+        else if (redDataMode == RED_DATA_ALL)
+        {
+            AddBundleToTxQueue (bundle->GetCborEncoding (), nextHopEngineId, bundle->GetCborEncodingSize ());
+        }
+        else
+        {
+            uint64_t redSize = 0;
+            std::vector<uint8_t> splitCborBundle = SplitBundle (bundle, redDataMode, &redSize);
+            AddBundleToTxQueue (splitCborBundle, nextHopEngineId, redSize);
+        }
+
         return 0;
     }
     NS_LOG_FUNCTION (this << " Unable to get bundle for eid: " << src.Uri ());
@@ -185,28 +202,77 @@ BpLtpClaProtocol::AddBundleToTxQueue (std::vector<uint8_t> cborBundle, uint64_t 
     txQueueVals.redSize = redSize;
     txQueueVals.dstLtpEngineId = dstLtpEngineId;
     txQueueVals.cborBundle = cborBundle;
-    m_txQueue.push (txQueueVals);
-
-    if (m_txQueue.size () == 1)
+    txQueueVals.waitingForAvailLink = false;
+    std::map<uint64_t, std::deque<TxQueueVals> >::iterator it = m_txQueueMap.find (dstLtpEngineId);
+    if (it == m_txQueueMap.end ())
     {
-        NS_LOG_FUNCTION (this << " TxQueueVals size is 1, sending immediately");
-        //Simulator::ScheduleNow (&BpLtpClaProtocol::SendBundleFromTxQueue, this);
-        SendBundleFromTxQueue ();
+        // queue for this dstLtpEngineId doesn't exist yet, so create it
+        std::deque<TxQueueVals> txQueue;
+        txQueue.push_back (txQueueVals);
+        m_txQueueMap.insert (std::pair<uint64_t, std::deque<TxQueueVals> >(dstLtpEngineId, txQueue));
+        // Since queue was just created, send the bundle immediately
+        SendBundleFromTxQueue (dstLtpEngineId);
+    }
+    else
+    {
+        // queue for this dstLtpEngineId already exists, so add to it
+        it->second.push_back (txQueueVals);
+        if (it->second.size () == 1)
+        {
+            NS_LOG_FUNCTION (this << " TxQueueVals size is 1, sending immediately");
+            //Simulator::ScheduleNow (&BpLtpClaProtocol::SendBundleFromTxQueue, this);
+            SendBundleFromTxQueue (dstLtpEngineId);
+        }
     }
 }
 
 void
-BpLtpClaProtocol::SendBundleFromTxQueue (void)
+BpLtpClaProtocol::SendBundleFromTxQueue (uint64_t dstLtpEngineId)
 {
     NS_LOG_FUNCTION (this);
-    if (m_txQueue.size () > 0)
+
+    // Check if IP routing table shows link available to destination node (currently supporting only IPv4)
+    // Have Ltp lookup ip address for destination LtpEngineId
+    InetSocketAddress destAddr = m_ltp -> GetBindingFromLtpEngineId (dstLtpEngineId);
+    if (destAddr == InetSocketAddress ("127.0.0.1",0))
     {
-        TxQueueVals txQueueVals = m_txQueue.front ();
-        //m_txQueue.pop (); // -- don't pop this off until after the Tx is complete
-        uint64_t ClientServiceId = 1; // 1 - bundle protocol
-        NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Sending bundle from txQueue to " << txQueueVals.dstLtpEngineId << " with redSize of " << txQueueVals.redSize << " immediately");
-        m_ltp -> StartTransmission (ClientServiceId, ClientServiceId, txQueueVals.dstLtpEngineId, txQueueVals.cborBundle, txQueueVals.redSize);
+        NS_LOG_FUNCTION (this << " Unable to get destination address for LtpEngineId: " << dstLtpEngineId);
+        return;
     }
+    
+    // Link is available, so check for packets to send
+    std::map<uint64_t, std::deque<TxQueueVals> >::iterator it = m_txQueueMap.find (dstLtpEngineId);
+    if (it != m_txQueueMap.end ())
+    {
+        if (it->second.size () > 0)
+        {
+            TxQueueVals txQueueVals = it->second.front ();
+            // Check if IP routing table shows link available to destination node (currently supporting only IPv4)
+            //m_bp->GetNode ()->GetRoutingProtocol ()->LookupRoute (destAddr.GetIpv4 (), destAddr.GetPort ());
+            //bool routeAvailable = m_bp->GetNode ()->GetObject<Ipv4> ()->GetRoutingTable ()->Lookup(destAddr.GetIpv4 (), NULL);
+            bool routeAvailable = m_bp->GetNode ()->GetObject<Ipv4> ()->GetRoutingProtocol ()->
+            //Lookup(destAddr.GetIpv4 (), NULL);
+            if (!routeAvailable)
+            {
+                NS_LOG_FUNCTION (this << " Unable to get route to destination address: " << destAddr.GetIpv4 () << " will wait for available link");
+                // Update txQueueVals to indicate that we're waiting for an available link
+                // Need to remove element, then re-insert at the front with updated value to not disrupt bundle Tx order
+                txQueueVals.waitingForAvailLink = true;
+                it->second.pop_front ();
+                it->second.push_front (txQueueVals);
+                return;
+            }
+            //it->second.pop (); // -- don't pop this off until after the Tx is complete; occurs in NotificationCallback
+            uint64_t ClientServiceId = 1; // 1 - bundle protocol
+            NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Sending bundle from txQueue to " << txQueueVals.dstLtpEngineId << " with redSize of " << txQueueVals.redSize << " immediately");
+            m_ltp -> StartTransmission (ClientServiceId, ClientServiceId, txQueueVals.dstLtpEngineId, txQueueVals.cborBundle, txQueueVals.redSize);
+        }
+    }
+    else
+    {
+        NS_LOG_FUNCTION (this << " Unable to find txQueue for dstLtpEngineId: " << dstLtpEngineId);
+    }
+    
 }
 
 int
@@ -240,10 +306,11 @@ int
 BpLtpClaProtocol::EnableSend (const BpEndpointId &src, const BpEndpointId &dst)
 {
     NS_LOG_FUNCTION (this << " " << src.Uri () << " " << dst.Uri ());
+    
     // No operation for Ltp
-    // But, can verify that target eid has route in BP route, the next hop L4address is registered, etc...
+    // But, can maybe verify that target eid has route in BP route, the next hop L4address is registered, etc...
     // Perhaps have a mapping from remote eid to status to indicate whether it's ok to send or not...
-    return -1;
+    return 0;
 }
 /*
 void
@@ -357,13 +424,15 @@ void
 BpLtpClaProtocol::SetL4Protocol (std::string l4Type)
 {
     NS_LOG_FUNCTION (this << " " << l4Type);
-
     
     ns3::Ptr<ns3::ltp::LtpProtocol> protocol = m_bp->GetNode()->GetObject<ns3::ltp::LtpProtocol>();
     uint64_t LtpEngineId = protocol->GetLocalEngineId ();
 
     m_ltp = protocol;
     m_LtpEngineId = LtpEngineId;
+
+    // Set callback functions of the transport layer
+    SetLinkStatusChangeCallback ();
 }
 /*
 void
@@ -524,12 +593,23 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
                 TxIt->second.status = code;  // End of a transmission session.  Update status and return -- WHEN SHOULD THIS RECORD BE REMOVED? 
                 NS_LOG_FUNCTION(this << " Sender notified session ID: " << id.GetSessionNumber () << " status updated.  Transmission session closed.");
                 // Once Sender is informed existing Tx is complete, pop the tx record off m_txQueue and check if more are ready to send
-                m_txQueue.pop (); // -- pop the bundle off the queue now that the Tx is complete
-                uint32_t txQueueSize  = m_txQueue.size ();
+                std::map<uint64_t, std::deque<TxQueueVals> >::iterator txQueueMapIt = m_txQueueMap.find (TxIt->second.dstLtpEngineId);
+                if (txQueueMapIt == m_txQueueMap.end ())
+                {
+                    NS_LOG_FUNCTION (this << " Unable to find txQueue for dstLtpEngineId: " << TxIt->second.dstLtpEngineId);
+                    return;
+                }
+                txQueueMapIt->second.pop_front (); // -- pop the bundle off the queue now that the Tx is complete
+                uint32_t txQueueSize  = txQueueMapIt->second.size ();
                 if (txQueueSize > 0)
                 {
-                    NS_LOG_FUNCTION (this << txQueueSize << " bundles remaining to send, sending next bundle immediately");
-                    Simulator::ScheduleNow(&BpLtpClaProtocol::SendBundleFromTxQueue, this);
+                    NS_LOG_FUNCTION (this << txQueueSize << " bundles remaining to send, scheduling to send next bundle immediately");
+                    Simulator::ScheduleNow(&BpLtpClaProtocol::SendBundleFromTxQueue, this, TxIt->second.dstLtpEngineId);
+                }
+                else // Queue is empty, so delete it from the map
+                {
+                    NS_LOG_FUNCTION (this << " No bundles remaining to send, deleting queue");
+                    m_txQueueMap.erase (TxIt->second.dstLtpEngineId);
                 }
                 return;
             }
@@ -581,8 +661,10 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
                 }
                 else
                 {
-                    NS_LOG_FUNCTION (this << " Receiver with engineID " << m_LtpEngineId << " passing CBOR bundle with" << assembledData.size() << " bytes to bundle protocol");
-                    m_bp->ReceiveCborVector (assembledData);
+                    NS_LOG_FUNCTION (this << " Receiver with engineID " << m_LtpEngineId << " passing bundle with CBOR size of " << assembledData.size() << " bytes to bundle protocol");
+                    //m_bp->ReceiveCborVector (assembledData);
+                    Ptr<BpBundle> assembledBundle = AssembleBundle (assembledData, RcvIt->second.rcvRedDataLength);
+                    m_bp->ReceiveBundle (assembledBundle);
                     m_rcvSessionMap.erase(RcvIt);
                 }
             }
@@ -611,6 +693,178 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
 
     }
     
+}
+
+std::vector<uint8_t>
+BpLtpClaProtocol::SplitBundle (Ptr<BpBundle> bundle, RedDataModes redDataMode, uint64_t *redSize)
+{
+    NS_LOG_FUNCTION (this << " redDataMode: " << redDataMode);
+    NS_LOG_FUNCTION (this << " Original bundle CBOR size is " << bundle->GetCborEncodingSize () << " bytes");
+
+    Ptr<BpBundle> splitBundle = CreateObject<BpBundle> ();
+    splitBundle->SetRetentionConstraint(bundle->GetRetentionConstraint ());
+    Ptr<BpBundle> greenBundle = CreateObject<BpBundle> ();
+    greenBundle->SetRetentionConstraint(bundle->GetRetentionConstraint ());
+    if (redDataMode == RED_DATA_SLIM)
+    {
+        // iterate through json fields looking for block with block number 0 (primary block)
+        //splitBundle->SetPrimaryBlock(&(bundle->GetPrimaryBlock ()));
+        if (splitBundle->AddBlocksFromBundle(bundle, 0) < 0) // 0 is block number for primary block
+        {
+            NS_LOG_FUNCTION (this << " Unable to get primary block from original bundle. Unable to send");
+            return std::vector<uint8_t> ();
+        }
+        if (greenBundle->AddBlocksFromBundleExcept(bundle, 0) < 0) // 0 is block number for primary block
+        {
+            NS_LOG_FUNCTION (this << " Unable to get non-primary blocks from original bundle. Unable to send");
+            return std::vector<uint8_t> ();
+        }
+    }
+    else // RED_DATA_ROBUST
+    {
+        if (splitBundle->AddBlocksFromBundleExcept(bundle, 1) < 0) // 1 is block number for payload block
+        {
+            NS_LOG_FUNCTION (this << " Unable to get all blocks except payload from original bundle. Unable to send");
+            return std::vector<uint8_t> ();
+        }
+        if (greenBundle->AddBlocksFromBundle(bundle, 1) < 0) // 1 is block number for payload block
+        {
+            NS_LOG_FUNCTION (this << " Unable to get payload block from original bundle. Unable to send");
+            return std::vector<uint8_t> ();
+        }
+    }
+    // Split bundles created, now generate CBOR vectors and combine
+    std::vector<uint8_t> splitVector = splitBundle->GetCborEncoding ();
+    std::vector<uint8_t> greenVector = greenBundle->GetCborEncoding ();
+    *redSize = splitVector.size ();
+    splitVector.insert (splitVector.end (), greenVector.begin (), greenVector.end ());
+    NS_LOG_FUNCTION (this << " split CBOR vector has size: " << splitVector.size () << " with red part size of: " << *redSize);
+    return splitVector;
+}
+
+
+Ptr<BpBundle>
+BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
+{
+    NS_LOG_FUNCTION (this << " data.size() = " << data.size() << "; redSize = " << redSize);
+    Ptr<BpBundle> bundle = CreateObject<BpBundle> ();
+    if (redSize > 0 && redSize < data.size ())
+    {
+        // redSize is the amount of the vector, in bytes, that is red data
+        // Since the vector is of type uint8_t, each element is 1 byte, making redSize usable as an index for the vector
+        std::vector<uint8_t> redData (data.begin (), data.begin () + redSize);
+        std::vector<uint8_t> greenData (data.begin () + redSize, data.end ());
+        //NS_ASSERT (redData.size () == redSize);
+        if (redData.size () != redSize)
+        {
+            NS_LOG_FUNCTION (this << " redData.size() = " << redData.size () << " != redSize = " << redSize);
+            return bundle;
+        }
+        Ptr<BpBundle> redBundle = CreateObject<BpBundle> ();
+        if ( redBundle->SetBundleFromCbor (redData) < 0 )
+        {
+            NS_LOG_FUNCTION (this << " Error processing red bundle.  Dropping data and returning empty bundle");
+            return CreateObject<BpBundle> ();
+        }
+
+        Ptr<BpBundle> greenBundle = CreateObject<BpBundle> ();
+        if ( greenBundle->SetBundleFromCbor (greenData) < 0 )
+        {
+            NS_LOG_FUNCTION (this << " Error processing green bundle.  Dropping green portion and returning red bundle");
+            return redBundle;
+        }
+        // Have both red and green portions - combine them into a single bundle
+
+        if (redBundle->AddBlocksFromBundle(greenBundle) < 0)
+        {
+            NS_LOG_FUNCTION (this << " Error adding green portion to red bundle. Dropping green portion and returning red bundle");
+            return redBundle;
+        }
+
+
+        //json::iterator it = greenBundle->begin();
+        //for (; it != greenBundle->end(); ++it)
+        //{
+        //    if (redBundle->AddToBundle(it.key(), it.value()) < 0)
+        //    {
+        //        NS_LOG_FUNCTION (this << " Error adding green portion to red bundle.  Dropping green portion and returning red bundle");
+        //        return redBundle;
+        //    }
+        //    //greenBundle[it.key()] = it.value();
+        //}
+        // red and green data combined into redBundle
+        //bundle = redBundle;
+        bundle->SetBundleFromJson (redBundle);
+        NS_LOG_FUNCTION (this << " Bundle assembled from both red and green parts; bundle payload has size: " << bundle->GetPayloadBlockPtr ()->GetBlockDataSize () << " bytes");
+    }
+    else
+    {
+        int retVal = bundle->SetBundleFromCbor (data);
+        if (retVal < 0)
+        {
+            NS_LOG_FUNCTION (this << " Error processing bundle.  Dropping data and returning empty bundle");
+            return CreateObject<BpBundle> ();
+        }
+    }
+    return bundle;
+}
+
+void
+BpLtpClaProtocol::LinkStatusChangeCallback(bool linkIsUp)
+{
+    NS_LOG_FUNCTION (this << linkIsUp);
+    if (linkIsUp)
+    {
+        CheckForBundleToSendFromTxQueue ();
+    }
+}
+
+void
+BpLtpClaProtocol::SetLinkStatusChangeCallback (void)
+{
+    NS_LOG_FUNCTION (this);
+    Ptr<Ipv4> ipv4 = m_bp->GetNode ()->GetObject<Ipv4> ();
+    for (uint32_t i = 1; i < ipv4->GetNInterfaces (); i++) // 0 is loopback; add callbacks on all of the nodes interfaces
+    {
+        Ptr<Ipv4Interface> interface = ipv4->GetInterface (i);
+        NS_LOG_FUNCTION (this << " Adding link status change callback for interface " << interface->GetAddress(0, 0).GetLocal ());
+        interface->SetLinkStatusCallback (MakeCallback (&BpLtpClaProtocol::LinkStatusChangeCallback));
+    }
+}
+
+void
+BpLtpClaProtocol::CheckForBundleToSendFromTxQueue(void)
+{
+    NS_LOG_FUNCTION (this);
+    // Check the first bundle in each queue to see if it's waiting on available link
+    std::map<uint64_t, std::deque<TxQueueVals> >::iterator it = m_txQueueMap.begin ();
+    for (; it != m_txQueueMap.end (); ++it)
+    {
+        if (it->second.size () > 0)
+        {
+            TxQueueVals txQueueVals = it->second.front ();
+            if (txQueueVals.waitingForAvailLink)
+            {
+                // bundle is waiting for link, so check if route is now available
+                // Have Ltp lookup ip address for destination LtpEngineId
+                InetSocketAddress destAddr = m_ltp -> GetBindingFromLtpEngineId (txQueueVals.dstLtpEngineId);
+                if (destAddr == InetSocketAddress ("127.0.0.1",0))
+                {
+                    NS_LOG_FUNCTION (this << " Unable to get destination address for LtpEngineId: " << txQueueVals.dstLtpEngineId);
+                    continue;
+                }
+                bool routeAvailable = m_bp->GetNode ()->GetObject<Ipv4> ()->GetRoutingTable ()->Lookup(destAddr.GetIpv4 (), NULL);
+                if (routeAvailable)
+                {
+                    txQueueVals.waitingForAvailLink = false;
+                    it->second.pop_front ();
+                    it->second.push_front (txQueueVals);
+                    NS_LOG_FUNCTION (this << " Route now available for destination address: " << destAddr.GetIpv4 () << " scheduling to send next bundle immediately");
+                    Simulator::ScheduleNow(&BpLtpClaProtocol::SendBundleFromTxQueue, this, TxIt->second.dstLtpEngineId);
+                }
+            }
+        }   
+    }
 }
 
 

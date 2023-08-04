@@ -293,6 +293,8 @@ public:
   */
   void ReceiveCborVector (std::vector <uint8_t> v_bundle);
 
+  void ReceiveBundle (Ptr<BpBundle> bundle);
+
   /**
    * Get and delete a bundle from the persistant storage
    *
@@ -388,6 +390,8 @@ private:
    */
   void RetreiveBundle ();
 
+  void RetreiveCBORBundle ();
+
   /**
    * \brief Bundle protocol specific startup code
    *
@@ -425,6 +429,7 @@ private:
   Ptr<Packet> m_bpRxBufferPacket; /// a buffer for all packets received from the CLA; bundles are retreived from this buffer
   //Ptr<BpBundle> m_bpRxBufferPacket; /// a buffer for all packets received from the CLA; bundles are retreived from this buffer
   std::queue<std::vector <uint8_t> > m_bpRxCborVectorQueue; /// a queue for all CBOR bundles received from the CLA; bundles are retreived from this queue
+  std::queue<Ptr<BpBundle> > m_bpRxBundleQueue; /// a queue for all bundles received from the CLA; bundles are retreived from this queue
 
   SequenceNumber32 m_seq;         /// the bundle sequence number
 
