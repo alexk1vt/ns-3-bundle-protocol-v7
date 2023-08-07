@@ -341,19 +341,210 @@ BpBundle::RebuildBundle ()
     this->GetCborEncoding ();
 }
 
-void
+
+// I need to do something different for block payloads
+// By RFC, block payloads are strings
+// So I need to either do something with serialize/deserialize from JSON
+// or do something like:
+//   m_bundle["payload_block"] = m_payloadBlock.dump();
+//   m_bundle["payload_block"] = json::parse(m_bundle["payload_block"].get<std::string>());
+//  m_bundle["payload_block"] = donatingBundle["payload_block"].get<std::string>();
+
+int
+BpBundle::AddBlocksFromBundle(Ptr<BpBundle> donatingBundle)
+{
+    NS_LOG_FUNCTION (this);
+    //m_bundle.merge_patch(donatingBundle->m_bundle);
+    
+    
+    json::iterator it = donatingBundle->begin ();
+    for (; it != donatingBundle->end (); ++it)
+    {
+        try
+        {
+            m_bundle[it.key ()] = it.value ();
+            //if (it.key () == "payload_block")
+            //{
+            //    m_bundle[it.key ()] = it.value ().get<std::string> ();
+            //}
+            //else
+            //{
+            //    m_bundle[it.key ()] = it.value ();
+            //}
+        }
+        catch (const std::exception& e)
+        {
+            NS_LOG_FUNCTION ("  ::AddBundleBlocksToBundle:: Exception caught: " << e.what());
+            return -1;
+        }
+    }
+    return 0;
+}
+
+int
+BpBundle::AddBlocksFromBundle(Ptr<BpBundle> donatingBundle, uint32_t blockNumber)
+{
+    NS_LOG_FUNCTION (this << blockNumber);
+    //json patch(donatingBundle->m_bundle);
+    //patch.erase("retention_constraint");
+
+    json::iterator it = donatingBundle->begin ();
+    for (; it != donatingBundle->end (); ++it)
+    {
+        if (it.value().contains("block_number") && it.value ()["block_number"] == blockNumber)
+        {
+            try
+            {
+                m_bundle[it.key ()] = it.value ();
+                //m_bundle[it.key ()].merge_patch(it.value ());
+
+                //if (it.key () == "payload_block")
+                //{
+                //    m_bundle[it.key ()] = it.value ().get<std::string> ();
+                //}
+                //else
+                //{
+                //    m_bundle[it.key ()] = it.value ();
+                //}
+            }
+            catch (const std::exception& e)
+            {
+                NS_LOG_FUNCTION ("  ::AddBundleBlocksToBundle:: Exception caught: " << e.what());
+                return -1;
+            }
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int
+BpBundle::AddBlocksFromBundleExcept(Ptr<BpBundle> donatingBundle, uint32_t blockNumber)
+{
+    NS_LOG_FUNCTION (this << blockNumber);
+    json::iterator it = donatingBundle->begin ();
+    for (; it != donatingBundle->end (); ++it)
+    {
+        if (it.value().contains("block_number") && it.value ()["block_number"] != blockNumber)
+        {
+            try
+            {
+                m_bundle[it.key ()] = it.value ();
+                //m_bundle[it.key ()].merge_patch(it.value ());
+
+                //if (it.key () == "payload_block")
+                //{
+                //    m_bundle[it.key ()] = it.value ().get<std::string> ();
+                //}
+                //else
+                //{
+                //    m_bundle[it.key ()] = it.value ();
+                //}
+            }
+            catch (const std::exception& e)
+            {
+                NS_LOG_FUNCTION ("  ::AddBundleBlocksToBundle:: Exception caught: " << e.what());
+                return -1;
+            }
+        }
+    }
+    return 0;
+}
+
+int
+BpBundle::AddToBundle(std::string key, BpCanonicalBlock block)
+{
+    NS_LOG_FUNCTION (this);
+
+    try
+    {
+        m_bundle[key] = block.GetJson(); 
+    }
+    catch(const std::exception& e)
+    {
+        NS_LOG_FUNCTION ("  ::AddToBundle:: Exception caught: " << e.what());
+        return -1;
+    }
+    return 0;
+    
+    /*
+    uint8_t blockType = block.GetBlockTypeCode();
+    if (blockType == 1)
+    {
+        m_payloadBlock = block;
+        m_bundle["payload_block"] = m_payloadBlock.GetJson();
+    }
+    else if (blockType == 2)
+    {
+        m_extensionBlock = block;
+        m_bundle["extension_block"] = m_extensionBlock.GetJson();
+    }
+    else
+    {
+        NS_LOG_FUNCTION ("  ::AddToBundle:: Invalid block type: " << blockType);
+        return -1;
+    }
+    return 0;
+    */
+}
+
+int
 BpBundle::SetBundleFromCbor (std::vector <std::uint8_t> cborBundle)
 {
     NS_LOG_FUNCTION (this);
     //PrintCborBytes (cborBundle);
-    m_bundle = json::from_cbor(cborBundle);
-    m_retentionConstraint = m_bundle["retention_constraint"];
-    m_primaryBlock.SetPrimaryBlockFromJson (m_bundle["primary_block"]);
-    m_payloadBlock.SetCanonicalBlockFromJson (m_bundle["payload_block"]);
-    if (GetExtensionBlockCount() > 0)
+    
+    try
+    {
+        m_bundle = json::from_cbor(cborBundle);
+    } catch (int exceptionValue) {
+        NS_LOG_FUNCTION ("  ::SetBundleFromCbor:: Unable to convert bundle from CBOR.  Exception caught: " << exceptionValue);
+        return -1;
+    }
+    
+    if (m_bundle.contains("retention_constraint"))
+    {
+        m_retentionConstraint = m_bundle["retention_constraint"];
+    }
+    if (m_bundle.contains("primary_block"))
+    {
+        m_primaryBlock.SetPrimaryBlockFromJson (m_bundle["primary_block"]);
+    }
+    if (m_bundle.contains("payload_block"))
+    {
+        m_payloadBlock.SetCanonicalBlockFromJson (m_bundle["payload_block"]);
+    }
+    if (m_bundle.contains("extension_block"))
     {
         m_extensionBlock.SetCanonicalBlockFromJson (m_bundle["extension_block"]); // TODO - implement support for multiple extension blocks
     }
+    return 0;
+}
+
+int
+BpBundle::SetBundleFromJson (Ptr<BpBundle> donorBundle)
+{
+    NS_LOG_FUNCTION (this);
+
+    m_bundle = donorBundle->m_bundle;
+    
+    if (m_bundle.contains("retention_constraint"))
+    {
+        m_retentionConstraint = m_bundle["retention_constraint"];
+    }
+    if (m_bundle.contains("primary_block"))
+    {
+        m_primaryBlock.SetPrimaryBlockFromJson (m_bundle["primary_block"]);
+    }
+    if (m_bundle.contains("payload_block"))
+    {
+        m_payloadBlock.SetCanonicalBlockFromJson (m_bundle["payload_block"]);
+    }
+    if (m_bundle.contains("extension_block"))
+    {
+        m_extensionBlock.SetCanonicalBlockFromJson (m_bundle["extension_block"]); // TODO - implement support for multiple extension blocks
+    }
+    return 0;
 }
 
 void
@@ -368,6 +559,27 @@ BpBundle::PrintCborBytes ()
         std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<uint8_t>(m_bundle_cbor_encoding[i]) << " ";
     }
     std::cout << std::endl;
+}
+
+bool
+BpBundle::empty ()
+{
+    NS_LOG_FUNCTION (this);
+    return m_bundle.empty();
+}
+
+json::iterator
+BpBundle::begin()
+{
+    NS_LOG_FUNCTION (this);
+    return m_bundle.begin();
+}
+
+json::iterator
+BpBundle::end()
+{
+    NS_LOG_FUNCTION (this);
+    return m_bundle.end();
 }
 
 } // namespace ns3

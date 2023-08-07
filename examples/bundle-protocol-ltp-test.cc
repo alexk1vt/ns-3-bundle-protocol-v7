@@ -60,6 +60,12 @@ void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, 
   sender->Send_data (reinterpret_cast<const uint8_t*>(data), size, src, dst);
 }
 
+void cla_send_bundle(Ptr<BundleProtocol> sender, char* data, BpEndpointId src, BpEndpointId dst)
+{
+  
+}
+
+
 void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
 {
 
@@ -101,7 +107,7 @@ main (int argc, char *argv[])
   NS_LOG_INFO ("Create channels.");
 
   std::ostringstream channelDelay;
-  channelDelay << "20ms";
+  channelDelay << "5ms";
 
   PointToPointHelper pointToPoint;
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("500Kbps"));
@@ -146,7 +152,7 @@ main (int argc, char *argv[])
   std::ostringstream l4type;
   l4type << "Ltp";
   Config::SetDefault ("ns3::BundleProtocol::L4Type", StringValue (l4type.str ()));
-  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (400)); // 400));  // -- is this saying bundles are segmented into 400 bytes?
+  Config::SetDefault ("ns3::BundleProtocol::BundleSize", UintegerValue (200)); // 400));  // -- is this saying bundles are segmented into 400 bytes?
 
   // build endpoint ids
   BpEndpointId eidSender ("dtn", "node0");

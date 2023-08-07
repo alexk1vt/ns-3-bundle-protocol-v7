@@ -298,6 +298,7 @@ public:
 
 private:
     uint8_t m_version;                      // the version of bundle protocol "version"
+    uint32_t m_blockNumber;                 // block number "block_number"
     uint64_t m_processingFlags;             // bundle processing control flags "processing_flags"
     BpEndpointId m_destEndpointId;          // destination endpoint id "destination"
     BpEndpointId m_sourceEndpointId;        // source endpoint id "source"

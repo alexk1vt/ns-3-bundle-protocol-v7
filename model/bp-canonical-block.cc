@@ -108,13 +108,14 @@ BpCanonicalBlock::SetCanonicalBlockFromJson (json jsonCanonicalBlock)
     m_crcType = m_canonical_block["crc_type"];
     // m_crcValue = m_canonical_block["crc_value"]; //TODO:  calculate CRC value
     //if (m_crcType != 0) // TODO:  Implement this!
-    m_blockData = m_canonical_block["block_data"];
+    m_blockData = m_canonical_block["block_data"].get<std::string> ();
 }
 
 void
 BpCanonicalBlock::SetBlockTypeCode (uint8_t code)
 {
     NS_LOG_FUNCTION (this << (int) code);
+    m_canonical_block["block_type_code"] = code;
     m_blockTypeCode = code;
 }
 
@@ -122,6 +123,7 @@ void
 BpCanonicalBlock::SetBlockNumber (uint32_t number)
 {
     NS_LOG_FUNCTION (this << number);
+    m_canonical_block["block_number"] = number;
     m_blockNumber = number;
 }
 
@@ -129,6 +131,7 @@ void
 BpCanonicalBlock::SetBlockProcessingFlags (uint64_t flags)
 {
     NS_LOG_FUNCTION (this << flags);
+    m_canonical_block["block_processing_flags"] = flags;
     m_blockProcessingFlags = flags;
 }
 
@@ -136,6 +139,7 @@ void
 BpCanonicalBlock::SetCrcType (uint8_t crcType)
 {
     NS_LOG_FUNCTION (this << (int) crcType);
+    m_canonical_block["crc_type"] = crcType;
     m_crcType = crcType;
 }
 
@@ -143,6 +147,7 @@ void
 BpCanonicalBlock::SetBlockData (std::string data)
 {
     NS_LOG_FUNCTION (this << data);
+    m_canonical_block["block_data"] = data;
     m_blockData = data;
 }
 
@@ -162,28 +167,28 @@ uint8_t
 BpCanonicalBlock::GetBlockTypeCode () const
 {
     NS_LOG_FUNCTION (this);
-    return m_blockTypeCode;
+    return m_canonical_block["block_type_code"];
 }
 
 uint32_t
 BpCanonicalBlock::GetBlockNumber () const
 {
     NS_LOG_FUNCTION (this);
-    return m_blockNumber;
+    return m_canonical_block["block_number"];
 }
 
 uint64_t
 BpCanonicalBlock::GetBlockProcessingFlags () const
 {
     NS_LOG_FUNCTION (this);
-    return m_blockProcessingFlags;
+    return m_canonical_block["block_processing_flags"];
 }
 
 uint8_t
 BpCanonicalBlock::GetCrcType () const
 {
     NS_LOG_FUNCTION (this);
-    return m_crcType;
+    return m_canonical_block["crc_type"];
 }
 
 uint32_t
@@ -197,14 +202,17 @@ std::string
 BpCanonicalBlock::GetBlockData () const
 {
     NS_LOG_FUNCTION (this);
-    return m_blockData;
+    return m_canonical_block["block_data"];
 }
 
 uint32_t
 BpCanonicalBlock::GetBlockDataSize () const
 {
     NS_LOG_FUNCTION (this);
-    return m_blockData.size ();
+    //return m_canonical_block["block_data"].size ();
+    std::string blockData = m_canonical_block["block_data"].get<std::string> ();
+    //NS_LOG_FUNCTION( this << " Block data: " << blockData << " Block data size: " << blockData.size ());
+    return blockData.size ();
 }
 
 json
@@ -222,6 +230,7 @@ BpCanonicalBlock::CalcCrcValue () const
     // remove CRC value from field (if present) (replace with zeros), then encode block in CBOR
     // calculate CRC value based on CRC type from CBOR encoding
     // restore original CrcValue to field and return newly calculated CRC value
+    return 0;
 }
 
 } // namespace ns3

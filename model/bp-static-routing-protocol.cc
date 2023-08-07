@@ -44,12 +44,17 @@ BpStaticRoutingProtocol::BpStaticRoutingProtocol ()
 BpStaticRoutingProtocol::~BpStaticRoutingProtocol ()
 { 
   NS_LOG_FUNCTION (this);
+
+  m_bp = 0;
+
+  m_routeMap.clear ();
 }
 
 void
 BpStaticRoutingProtocol::SetBundleProtocol (Ptr<BundleProtocol> bundleProtocol)
 { 
   NS_LOG_FUNCTION (this << " " << bundleProtocol);
+  //m_bp->Unref();
   m_bp = bundleProtocol;
 }
 

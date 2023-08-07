@@ -130,8 +130,13 @@ public:
      * 
      * \param cborEncoding the bundle CBOR encoding
      */
-    void SetBundleFromCbor (const std::vector <std::uint8_t> cborEncoding);
+    int SetBundleFromCbor (const std::vector <std::uint8_t> cborEncoding);
     
+    int AddToBundle(std::string key, BpCanonicalBlock block);
+    int AddBlocksFromBundle(Ptr<BpBundle> donatingBundle);
+    int AddBlocksFromBundle(Ptr<BpBundle> donatingBundle, uint32_t blockNumber);
+    int AddBlocksFromBundleExcept(Ptr<BpBundle> donatingBundle, uint32_t blockNumber);
+    int SetBundleFromJson (Ptr<BpBundle> donorBundle);
 
   // Getters
 
@@ -225,8 +230,15 @@ public:
      */
     uint GetCborEncodingSize ();
     void PrintCborBytes ();
+    bool empty ();
 
     // TODO:  Add the rest of the getters
+
+    /*
+    * Iterator operations
+    */
+    json::iterator begin();
+    json::iterator end();
 
     /*
     * Inline operators
