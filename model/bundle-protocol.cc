@@ -131,6 +131,7 @@ BundleProtocol::Open (Ptr<Node> node)
       //m_cla->SetL4Protocol (m_node->GetObject<ns3::ltp::LtpProtocol>(), m_node->GetObject<ns3::ltp::LtpProtocol>()->GetLocalEngineId ()); 
       //m_cla->SetL4Protocol (protocol, engineId);//, true);
       m_cla->SetL4Protocol (m_l4Type);
+      cla->SetLinkStatusCheckDelay(1);
     }
   else
     {

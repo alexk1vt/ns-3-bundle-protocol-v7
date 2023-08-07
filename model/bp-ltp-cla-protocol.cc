@@ -10,6 +10,10 @@
 #include "ns3/object-vector.h"
 #include "ns3/packet.h"
 #include "ns3/ipv4.h"
+#include "ns3/ipv4-interface.h"
+#include "ns3/ipv4-address.h"
+#include "ns3/ipv4-header.h"
+#include "ns3/ipv4-routing-protocol.h"
 
 
 #include "ns3/node.h"
@@ -49,7 +53,8 @@ BpLtpClaProtocol::GetTypeId (void)
 BpLtpClaProtocol::BpLtpClaProtocol ()
     : m_bp (0),
       m_bpRouting (0),
-      m_txCnt (0)
+      m_txCnt (0),
+      m_linkStatusCheckDelay (1)
 {
     NS_LOG_FUNCTION (this);
 }
@@ -202,28 +207,72 @@ BpLtpClaProtocol::AddBundleToTxQueue (std::vector<uint8_t> cborBundle, uint64_t 
     txQueueVals.redSize = redSize;
     txQueueVals.dstLtpEngineId = dstLtpEngineId;
     txQueueVals.cborBundle = cborBundle;
-    txQueueVals.waitingForAvailLink = false;
+    
     std::map<uint64_t, std::deque<TxQueueVals> >::iterator it = m_txQueueMap.find (dstLtpEngineId);
     if (it == m_txQueueMap.end ())
     {
         // queue for this dstLtpEngineId doesn't exist yet, so create it
+        txQueueVals.waitStatus = LINK_WAITING_STATUS_CHECK; // will always wait on initial request to send
         std::deque<TxQueueVals> txQueue;
         txQueue.push_back (txQueueVals);
         m_txQueueMap.insert (std::pair<uint64_t, std::deque<TxQueueVals> >(dstLtpEngineId, txQueue));
         // Since queue was just created, send the bundle immediately
-        SendBundleFromTxQueue (dstLtpEngineId);
+        //SendBundleFromTxQueue (dstLtpEngineId);
+        if (SendIfLinkUp (dstLtpEngineId) < 0)
+        {
+            NS_LOG_FUNCTION (this << " Unable to make connection request to destination address: " << dstLtpEngineId << ". Scheduling link status check");
+            Simulator::Schedule (Seconds (m_linkStatusCheckDelay), &BpLtpClaProtocol::CheckLinkStatus, this);
+        }
     }
     else
     {
         // queue for this dstLtpEngineId already exists, so add to it
-        it->second.push_back (txQueueVals);
-        if (it->second.size () == 1)
+        if (it->second.size () == 0)
         {
+            txQueueVals.waitStatus = LINK_WAITING_STATUS_CHECK; // will always wait on initial request to send
+            it->second.push_back (txQueueVals);
             NS_LOG_FUNCTION (this << " TxQueueVals size is 1, sending immediately");
             //Simulator::ScheduleNow (&BpLtpClaProtocol::SendBundleFromTxQueue, this);
-            SendBundleFromTxQueue (dstLtpEngineId);
+            //SendBundleFromTxQueue (dstLtpEngineId);
+            if (SendIfLinkUp (dstLtpEngineId) < 0)
+            {
+                NS_LOG_FUNCTION (this << " Unable to make connection request to destination address: " << dstLtpEngineId << ". Scheduling link status check");
+                Simulator::Schedule (Seconds (m_linkStatusCheckDelay), &BpLtpClaProtocol::CheckLinkStatus, this);
+            }
+        }
+        else
+        {
+            txQueueVals.waitStatus = LINK_WAITING_NONE;
+            it->second.push_back (txQueueVals);
+            NS_LOG_FUNCTION (this << " Bundles already waiting in queue to send");            
         }
     }
+}
+
+void
+BpLtpClaProtocol::CheckLinkStatus (void)
+{
+    NS_LOG_FUNCTION (this);
+
+    // Try sending any bundles that are waiting on link status check
+    CheckForBundleToSendFromTxQueue (LINK_WAITING_LINK_UP_CB);
+
+    // See if any bundles are still waiting and schedule another check if so
+    std::map<uint64_t, std::deque<TxQueueVals> >::iterator it = m_txQueueMap.begin ();
+    while (it != m_txQueueMap.end ())
+    {
+        if (it->second.size () > 0)
+        {
+            if (it->second.front ().waitStatus == LINK_WAITING_STATUS_CHECK)
+            {
+                NS_LOG_FUNCTION (this << " Bundles still waiting for link status check, scheduling another check");
+                Simulator::Schedule (Seconds (m_linkStatusCheckDelay), &BpLtpClaProtocol::CheckLinkStatus, this);
+                return;
+            }
+        }
+        it++;
+    }
+
 }
 
 void
@@ -231,37 +280,12 @@ BpLtpClaProtocol::SendBundleFromTxQueue (uint64_t dstLtpEngineId)
 {
     NS_LOG_FUNCTION (this);
 
-    // Check if IP routing table shows link available to destination node (currently supporting only IPv4)
-    // Have Ltp lookup ip address for destination LtpEngineId
-    InetSocketAddress destAddr = m_ltp -> GetBindingFromLtpEngineId (dstLtpEngineId);
-    if (destAddr == InetSocketAddress ("127.0.0.1",0))
-    {
-        NS_LOG_FUNCTION (this << " Unable to get destination address for LtpEngineId: " << dstLtpEngineId);
-        return;
-    }
-    
-    // Link is available, so check for packets to send
     std::map<uint64_t, std::deque<TxQueueVals> >::iterator it = m_txQueueMap.find (dstLtpEngineId);
     if (it != m_txQueueMap.end ())
     {
         if (it->second.size () > 0)
         {
             TxQueueVals txQueueVals = it->second.front ();
-            // Check if IP routing table shows link available to destination node (currently supporting only IPv4)
-            //m_bp->GetNode ()->GetRoutingProtocol ()->LookupRoute (destAddr.GetIpv4 (), destAddr.GetPort ());
-            //bool routeAvailable = m_bp->GetNode ()->GetObject<Ipv4> ()->GetRoutingTable ()->Lookup(destAddr.GetIpv4 (), NULL);
-            bool routeAvailable = m_bp->GetNode ()->GetObject<Ipv4> ()->GetRoutingProtocol ()->
-            //Lookup(destAddr.GetIpv4 (), NULL);
-            if (!routeAvailable)
-            {
-                NS_LOG_FUNCTION (this << " Unable to get route to destination address: " << destAddr.GetIpv4 () << " will wait for available link");
-                // Update txQueueVals to indicate that we're waiting for an available link
-                // Need to remove element, then re-insert at the front with updated value to not disrupt bundle Tx order
-                txQueueVals.waitingForAvailLink = true;
-                it->second.pop_front ();
-                it->second.push_front (txQueueVals);
-                return;
-            }
             //it->second.pop (); // -- don't pop this off until after the Tx is complete; occurs in NotificationCallback
             uint64_t ClientServiceId = 1; // 1 - bundle protocol
             NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Sending bundle from txQueue to " << txQueueVals.dstLtpEngineId << " with redSize of " << txQueueVals.redSize << " immediately");
@@ -447,6 +471,13 @@ BpLtpClaProtocol::GetL4Socket (Ptr<Packet> packet)
     NS_LOG_FUNCTION (this << packet);
     // Unsure if this needs to be implemented
     return Ptr <Socket> ();
+}
+
+void
+BpLtpClaProtocol::SetLinkStatusCheckDelay (uint32_t delay)
+{
+    NS_LOG_FUNCTION (this << delay);
+    m_linkStatusCheckDelay = delay;
 }
 
 // private
@@ -681,7 +712,7 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
             {
                 if (it->second.set && it->second.sessionId == id)
                 {
-                    it->second.status = code;  // NOTE: This only means initial Tx is complete - re-TX may stil occur as needed
+                    it->second.status = code;  // NOTE: This only means initial Tx is complete - re-TX at LTP level may stil occur as needed
                     break;
                 }
             }
@@ -810,13 +841,15 @@ BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
 }
 
 void
-BpLtpClaProtocol::LinkStatusChangeCallback(bool linkIsUp)
+BpLtpClaProtocol::LinkStatusChangeCallback()//(bool linkIsUp)
 {
-    NS_LOG_FUNCTION (this << linkIsUp);
-    if (linkIsUp)
-    {
-        CheckForBundleToSendFromTxQueue ();
-    }
+    //NS_LOG_FUNCTION (this << linkIsUp);
+    NS_LOG_FUNCTION (this);
+    //if (linkIsUp)
+    //{
+    //    CheckForBundleToSendFromTxQueue ();
+    //}
+    CheckForBundleToSendFromTxQueue (LINK_WAITING_LINK_UP_CB);
 }
 
 void
@@ -826,16 +859,19 @@ BpLtpClaProtocol::SetLinkStatusChangeCallback (void)
     Ptr<Ipv4> ipv4 = m_bp->GetNode ()->GetObject<Ipv4> ();
     for (uint32_t i = 1; i < ipv4->GetNInterfaces (); i++) // 0 is loopback; add callbacks on all of the nodes interfaces
     {
-        Ptr<Ipv4Interface> interface = ipv4->GetInterface (i);
-        NS_LOG_FUNCTION (this << " Adding link status change callback for interface " << interface->GetAddress(0, 0).GetLocal ());
-        interface->SetLinkStatusCallback (MakeCallback (&BpLtpClaProtocol::LinkStatusChangeCallback));
+        //Ptr<Ipv4Interface> interface = ipv4->GetInterface (i);
+        Ptr<NetDevice> netDevice = ipv4->GetNetDevice (i);
+        
+        NS_LOG_FUNCTION (this << " Adding link status change callback for interface " << i);
+        
+        netDevice->AddLinkChangeCallback (MakeCallback (&BpLtpClaProtocol::LinkStatusChangeCallback, this));
     }
 }
 
 void
-BpLtpClaProtocol::CheckForBundleToSendFromTxQueue(void)
+BpLtpClaProtocol::CheckForBundleToSendFromTxQueue(BpLtpClaProtocol::LinkWaitingStatus linkWaitStatus)
 {
-    NS_LOG_FUNCTION (this);
+    NS_LOG_FUNCTION (this << linkWaitStatus);
     // Check the first bundle in each queue to see if it's waiting on available link
     std::map<uint64_t, std::deque<TxQueueVals> >::iterator it = m_txQueueMap.begin ();
     for (; it != m_txQueueMap.end (); ++it)
@@ -843,27 +879,175 @@ BpLtpClaProtocol::CheckForBundleToSendFromTxQueue(void)
         if (it->second.size () > 0)
         {
             TxQueueVals txQueueVals = it->second.front ();
-            if (txQueueVals.waitingForAvailLink)
+            NS_LOG_FUNCTION (this << " Checking bundle in txQueue for dstLtpEngineId: " << txQueueVals.dstLtpEngineId << " with wait status of: " << txQueueVals.waitStatus);
+            if (txQueueVals.waitStatus == linkWaitStatus)
             {
-                // bundle is waiting for link, so check if route is now available
-                // Have Ltp lookup ip address for destination LtpEngineId
-                InetSocketAddress destAddr = m_ltp -> GetBindingFromLtpEngineId (txQueueVals.dstLtpEngineId);
-                if (destAddr == InetSocketAddress ("127.0.0.1",0))
-                {
-                    NS_LOG_FUNCTION (this << " Unable to get destination address for LtpEngineId: " << txQueueVals.dstLtpEngineId);
-                    continue;
-                }
-                bool routeAvailable = m_bp->GetNode ()->GetObject<Ipv4> ()->GetRoutingTable ()->Lookup(destAddr.GetIpv4 (), NULL);
-                if (routeAvailable)
-                {
-                    txQueueVals.waitingForAvailLink = false;
-                    it->second.pop_front ();
-                    it->second.push_front (txQueueVals);
-                    NS_LOG_FUNCTION (this << " Route now available for destination address: " << destAddr.GetIpv4 () << " scheduling to send next bundle immediately");
-                    Simulator::ScheduleNow(&BpLtpClaProtocol::SendBundleFromTxQueue, this, TxIt->second.dstLtpEngineId);
-                }
+                txQueueVals.waitStatus = LINK_WAITING_STATUS_CHECK;
+                it->second.pop_front ();
+                it->second.push_front (txQueueVals);
+                NS_LOG_FUNCTION (this << " Checking for available link to destination engine id: " << txQueueVals.dstLtpEngineId);
+                SendIfLinkUp (txQueueVals.dstLtpEngineId);
             }
         }   
+    }
+}
+
+// A clumsy way to verify link availability before passing bundle to Ltp since
+// Ltp does not do so prior to sending packet -- results in loss of Green data
+// whenever sending data prior to link being available
+int
+BpLtpClaProtocol::SendIfLinkUp(uint64_t dstLtpEngineId)
+{
+    NS_LOG_FUNCTION (this << dstLtpEngineId);
+    bool ableToSend = false;
+
+    InetSocketAddress destAddr = m_ltp->GetBindingFromLtpEngineId (dstLtpEngineId);
+    if (destAddr == InetSocketAddress ("127.0.0.1", 0))
+    {
+        NS_LOG_FUNCTION (this << "Unable to find destination address for LtpEngineId: " << dstLtpEngineId);
+        //return -1;
+    }
+    else
+    {
+        Ptr<Ipv4> nodeIpv4 = m_bp->GetNode ()->GetObject<Ipv4> ();
+        Ptr<Ipv4RoutingProtocol> routingProtocol = nodeIpv4->GetRoutingProtocol ();
+        Ipv4Header ipv4Header;
+        ipv4Header.SetDestination(destAddr.GetIpv4 ());
+        Socket::SocketErrno sockErr;
+        Ptr<Ipv4Route> route = routingProtocol->RouteOutput(NULL, ipv4Header, 0, sockErr);
+        if (sockErr != Socket::ERROR_NOTERROR || !route)
+        {
+            NS_LOG_FUNCTION (this << " No route to destination address: " << destAddr.GetIpv4 ());
+            //return -1;
+        }
+        else
+        {
+            NS_LOG_FUNCTION (this << " Route exists to destination address: " << destAddr.GetIpv4 () << " checking interface and device status");
+            uint32_t outputIfIndex = nodeIpv4->GetInterfaceForDevice (route->GetOutputDevice ());
+            // Check if both Ipv4 Interface and NetDevice are up
+            //Ptr<Ipv4Interface> interface = nodeIpv4->GetInterface (outputIfIndex);
+            //if (!interface->IsUp ())
+            Ptr<NetDevice> netDevice = nodeIpv4->GetNetDevice (outputIfIndex);
+            if (!nodeIpv4->IsUp (outputIfIndex) || !netDevice->IsLinkUp ())
+            {
+                NS_LOG_FUNCTION (this << " No interface or device available for interface index " << outputIfIndex);
+                //return -1;
+            }
+            else
+            {
+                ableToSend = true;
+            }
+        }
+    }
+    if (!ableToSend)
+    {
+        std::map<uint64_t, std::deque<TxQueueVals> >::iterator it = m_txQueueMap.find (dstLtpEngineId);
+        if (it != m_txQueueMap.end ())
+        {
+            if (it->second.size () > 0)
+            {
+                TxQueueVals txQueueVals = it->second.front ();
+                if (txQueueVals.waitStatus == LINK_WAITING_STATUS_CHECK)
+                {
+                    txQueueVals.waitStatus = LINK_WAITING_LINK_UP_CB; // change wait status to wait for link up callback
+                    it->second.pop_front ();
+                    it->second.push_front (txQueueVals);
+                }
+            }
+        }
+        return -1;
+    }
+    
+    NS_LOG_FUNCTION (this << " Route and link available to LtpEngineId: " << dstLtpEngineId);
+    SendBundleFromTxQueue (dstLtpEngineId);
+    return 0;
+}
+
+
+/*
+int
+BpLtpClaProtocol::SendIfLinkUp(uint64_t dstLtpEngineId)
+{
+    NS_LOG_FUNCTION (this << dstLtpEngineId);
+
+    InetSocketAddress destAddr = m_ltp->GetBindingFromLtpEngineId (dstLtpEngineId);
+    if (destAddr == InetSocketAddress ("127.0.0.1", 0))
+    {
+        NS_LOG_FUNCTION (this << "Unable to find destination address for LtpEngineId: " << dstLtpEngineId);
+        return -1;
+    }
+
+    TypeId tid;
+    tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
+    Ptr<Socket> socket = Socket::CreateSocket (m_bp->GetNode (), tid);
+
+    if (socket->Bind () != 0)
+    {
+        NS_LOG_FUNCTION (this << " Unable to bind socket");
+        return -1;
+    }
+    socket->SetConnectCallback(MakeCallback (&BpLtpClaProtocol::ConnectionRequestSucceededCallback, this),
+                               MakeCallback (&BpLtpClaProtocol::ConnectionRequestFailedCallback, this));
+
+    m_socketToLtpEngineId.insert (std::pair<Ptr<Socket>, uint64_t>(socket, dstLtpEngineId));
+
+    if (socket->Connect (destAddr) != 0)
+    {
+        NS_LOG_FUNCTION (this << " Unable to connect to destination address: " << destAddr);
+        socket->Close();
+        return -1;
+    }
+    NS_LOG_FUNCTION (this << " Connection request pending for dest LtpEngineID: " << dstLtpEngineId << " with address: " << destAddr.GetIpv4 () << "; waiting for callback");
+    //socket->Close();  // Close this in the callback
+    return 0;
+}
+*/
+
+void
+BpLtpClaProtocol::ConnectionRequestSucceededCallback (Ptr<Socket> socket)
+{
+    NS_LOG_FUNCTION (this << socket);
+
+    std::map<Ptr<Socket>, uint64_t>::iterator it = m_socketToLtpEngineId.find(socket);
+    if (it == m_socketToLtpEngineId.end ())
+    {
+        NS_LOG_FUNCTION (this << "Unable to find socket in m_socketToLtpEngineId");
+        return;
+    }
+    uint64_t dstLtpEngineId = it->second;
+    m_socketToLtpEngineId.erase(socket);
+
+    NS_LOG_FUNCTION (this << " Connection request succeeded to EngineID: " << dstLtpEngineId);
+    // Now process Send Queue
+    SendBundleFromTxQueue (dstLtpEngineId);
+
+    socket->Close();
+}
+
+void
+BpLtpClaProtocol::ConnectionRequestFailedCallback (Ptr<Socket> socket)
+{
+    NS_LOG_FUNCTION (this << socket);
+    socket->Close();
+    // Connection request failed, so need to wait for linkstatuschange callback
+    Address address;
+    socket->GetSockName (address);
+    InetSocketAddress destAddr = InetSocketAddress::ConvertFrom (address);
+    uint64_t dstLtpEngineId = m_ltp->GetBindingFromIpv4Addr (destAddr);
+
+    std::map<uint64_t, std::deque<TxQueueVals> >::iterator it = m_txQueueMap.find (dstLtpEngineId);
+    if (it != m_txQueueMap.end ())
+    {
+        if (it->second.size () > 0)
+        {
+            TxQueueVals txQueueVals = it->second.front ();
+            if (txQueueVals.waitStatus == LINK_WAITING_STATUS_CHECK)
+            {
+                txQueueVals.waitStatus = LINK_WAITING_LINK_UP_CB; // change wait status to wait for link up callback
+                it->second.pop_front ();
+                it->second.push_front (txQueueVals);
+            }
+        }
     }
 }
 

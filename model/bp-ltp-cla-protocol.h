@@ -87,6 +87,8 @@ public:
 
     void SetL4Callbacks (void);
 
+    void SetLinkStatusCheckDelay (uint32_t delay);
+
 
   /*
   * Red Data modes
@@ -100,6 +102,15 @@ public:
 
 private:
 
+  /*
+  * Link waiting status
+  */
+    typedef enum {
+        LINK_WAITING_NONE           = 0,
+        LINK_WAITING_STATUS_CHECK   = 1,
+        LINK_WAITING_LINK_UP_CB     = 2
+    } LinkWaitingStatus;
+
     /**
      * \brief Set callback functions of the transport layer
      * 
@@ -110,7 +121,7 @@ private:
     void NotificationCallback (ns3::ltp::SessionId id, ns3::ltp::StatusNotificationCode code, std::vector<uint8_t> data, uint32_t dataLength, bool endFlag, uint64_t srcLtpEngine, uint32_t offset);
 
     void SetLinkStatusChangeCallback (void);
-    void LinkStatusChangeCallback(bool linkIsUp);
+    void LinkStatusChangeCallback ();//(bool linkIsUp);
 
     std::vector<uint8_t> SplitBundle (Ptr<BpBundle> bundle, RedDataModes redDataMode, uint64_t *redSize);
     Ptr<BpBundle> AssembleBundle (std::vector<uint8_t> data, uint64_t redSize);
@@ -118,7 +129,13 @@ private:
     void StartTransmission (Ptr<BpBundle> bundle, BpEndpointId nextHopEid, uint64_t nextHopEngineId, uint64_t redSize);
     void AddBundleToTxQueue (std::vector<uint8_t> cborBundle, uint64_t dstLtpEngineId, uint64_t redSize);
     void SendBundleFromTxQueue (uint64_t dstLtpEngineId);
-    void CheckForBundleToSendFromTxQueue(void);
+    void CheckForBundleToSendFromTxQueue(LinkWaitingStatus waitStatus);
+    int SendIfLinkUp (uint64_t destLtpEngineId);
+    void CheckLinkStatus (void);
+
+    // Callbacks
+    void ConnectionRequestSucceededCallback (Ptr<Socket> socket);
+    void ConnectionRequestFailedCallback (Ptr<Socket> socket);
 
     void IncrementTxCnt (void);
     void DecrementTxCnt (void);
@@ -138,7 +155,7 @@ private:
         uint64_t redSize;
         uint64_t dstLtpEngineId;
         std::vector<uint8_t> cborBundle;
-        bool waitingForAvailLink;
+        LinkWaitingStatus waitStatus;
 
     };
 
@@ -165,6 +182,11 @@ private:
     uint32_t m_txCnt;                                            // Counter of all transmissions attempted in current time instance
     //std::queue<TxQueueVals> m_txQueue;                           // Queue of bundles to be transmitted
     std::map<uint64_t, std::deque<TxQueueVals> > m_txQueueMap;    // Map of Tx queues for each LTP engine ID
+
+    // Verifying link availability prior to sending bundle to Ltp
+    std::map<Ptr<Socket>, uint64_t> m_socketToLtpEngineId;        // Map of sockets to LTP engine IDs
+
+    uint32_t m_linkStatusCheckDelay;                              // Time delay before rechecking link for status
 };
 
 } // namespace ns3
