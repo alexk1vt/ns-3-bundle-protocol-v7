@@ -42,12 +42,23 @@ namespace ns3 {
  * The structure of canonical blocks, which is defined in section 4.3.1 of RFC 9171.
  * 
 */
+
+// Canonical Block Field name strings for JSON
+extern std::string CANONICAL_BLOCK_FIELD_TYPE_CODE; // = "00";
+extern std::string CANONICAL_BLOCK_FIELD_BLOCK_NUMBER; // = "01";
+extern std::string CANONICAL_BLOCK_FIELD_BLOCK_PROCESSING_FLAGS; // = "02";
+extern std::string CANONICAL_BLOCK_FIELD_CRC_TYPE; // = "03";
+extern std::string CANONICAL_BLOCK_FIELD_BLOCK_DATA; // = "04";
+extern std::string CANONICAL_BLOCK_FIELD_CRC_VALUE; // = "05";
+
+
 class BpCanonicalBlock
 {
 public:
   BpCanonicalBlock ();
   BpCanonicalBlock (uint8_t code, uint32_t number, uint64_t flags, uint8_t crcType, std::string data);
-  BpCanonicalBlock(uint8_t blockTypeCode, uint32_t payloadSize, const uint8_t *payloadData);
+  BpCanonicalBlock (uint8_t code, uint8_t number, uint64_t flags, uint8_t crcType, uint32_t payloadSize, const uint8_t *payloadData);
+  BpCanonicalBlock (uint8_t blockTypeCode, uint32_t payloadSize, const uint8_t *payloadData);
   virtual ~BpCanonicalBlock ();
 
   // Setters
@@ -110,7 +121,7 @@ public:
     /**
      * \brief Rebuild the canonical block with current configured values
     */
-    void RebuildBlock ();
+    //void RebuildBlock ();
 
   // Getters
     /**
@@ -158,17 +169,21 @@ public:
     */
     uint32_t CalcCrcValue () const;
 
+    bool IsEmpty () const;
+
     // TODO:  Add the rest of the getters
 
   /*
   * Block Type Codes
   */
     typedef enum {
+        BLOCK_TYPE_PRIMARY = 0, // is 'reserved' per RFC 9171, but using to ensure primary block is sequenced first
         BLOCK_TYPE_PAYLOAD = 1,
         BLOCK_TYPE_PREVIOUS_NODE = 6,
         BLOCK_TYPE_BUNDLE_AGE = 7,
-        BLOCK_TYPE_HOP_COUNT = 10
-    } BlockTypeCodes;
+        BLOCK_TYPE_HOP_COUNT = 10,
+        BLOCK_TYPE_UNSPECIFIED = 11
+    } CanonicalBlockTypeCodes;
 
   /*
   * Block processing control flags
@@ -180,13 +195,27 @@ public:
         BLOCK_DISCARD_BLOCK_IF_NOT_PROCESSED = 1 << 4
     } BlockProcessingFlags;
 
+  /*
+  * Canonical Block Field Index values
+  */
+  //typedef enum {
+  //  CANONICAL_BLOCK_TYPE_CODE = 0,
+  //  CANONICAL_BLOCK_BLOCK_NUMBER = 1,
+  //  CANONICAL_BLOCK_BLOCK_PROCESSING_FLAGS = 2,
+  //  CANONICAL_BLOCK_CRC_TYPE = 3,
+  //  CANONICAL_BLOCK_BLOCK_DATA = 4,
+  //  CANONICAL_BLOCK_CRC_VALUE = 5
+  //} CanonicalBlockFields;
+
+  
+
 private:
-    uint8_t m_blockTypeCode;                // block type code "block_type_code"
-    uint32_t m_blockNumber;                 // block number "block_number"
-    uint64_t m_blockProcessingFlags;        // block processing control flags "block_processing_flags"
-    uint8_t m_crcType;                      // CRC Type "crc_type"
-    uint32_t m_crcValue;                    // CRC of primary block "crc_value"
-    std::string m_blockData;                     // block data "block_data"
+    //uint8_t m_blockTypeCode;                // block type code "block_type_code"
+    //uint32_t m_blockNumber;                 // block number "block_number"
+    //uint64_t m_blockProcessingFlags;        // block processing control flags "block_processing_flags"
+    //uint8_t m_crcType;                      // CRC Type "crc_type"
+    //uint32_t m_crcValue;                    // CRC of primary block "crc_value"
+    //std::string m_blockData;                     // block data "block_data"
 
     // the canonical block, section 4.3.2, RFC 9171
     json m_canonical_block;                 // canonical block

@@ -392,6 +392,13 @@ private:
 
   void RetreiveCBORBundle ();
 
+  // Extension Block Support
+  //void AddUpdateExtBundle (uint32_t blockType, Ptr<BpBundle> bundle);
+  //void AddUpdatePrevNodeExtBlock (Ptr<BpBundle> bundle);
+  //void AddUpdateBundleAgeExtBlock (Ptr<BpBundle> bundle);
+  //void AddUpdateHopCountExtBlock (Ptr<BpBundle> bundle);
+  void ProcessExtensionBlocks (Ptr<BpBundle> bundle, bool printOnly = false);
+
   /**
    * \brief Bundle protocol specific startup code
    *

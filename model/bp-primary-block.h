@@ -200,7 +200,7 @@ public:
     /**
      * \brief Rebuild the primary bundle block with current configured values
     */
-    void RebuildBlock ();
+    //void RebuildBlock ();
 
   // Getters
 
@@ -284,7 +284,8 @@ public:
   /*
   * Bundle processing control flags
   */
-    typedef enum {
+    //typedef enum {
+    enum class BundleProcessingFlags : uint64_t {
         BUNDLE_IS_FRAGMENT             = 1 << 0,
         BUNDLE_ADU_IS_ADMIN_RECORD     = 1 << 1,
         BUNDLE_DO_NOT_FRAGMENT         = 1 << 2,
@@ -294,21 +295,50 @@ public:
         BUNDLE_FORWARD_REPORT_REQUEST  = 1 << 16,
         BUNDLE_DELIVERY_REPORT_REQUEST = 1 << 17,
         BUNDLE_DELETION_REPORT_REQUEST = 1 << 18,
-    } BundleProcessingFlags;
+    };// BundleProcessingFlags;
+
+  /*
+  * Primary Block Field Index values
+  */
+  //typedef enum {
+  //  PRIMARY_BLOCK_VERSION = 0,
+  //  PRIMARY_BLOCK_BUNDLE_PROCESSING_FLAGS = 1,
+  //  PRIMARY_BLOCK_CRC_TYPE = 2,
+  //  PRIMARY_BLOCK_DESTINATION = 3,
+  //  PRIMARY_BLOCK_SOURCE = 4,
+  //  PRIMARY_BLOCK_REPORT_TO = 5,
+  //  PRIMARY_BLOCK_CREATION_TIMESTAMP = 6,
+  //  PRIMARY_BLOCK_LIFETIME = 7,
+  //  PRIMARY_BLOCK_FRAGMENT_OFFSET = 8,
+  //  PRIMARY_BLOCK_ADU_LENGTH = 9,
+  //  PRIMARY_BLOCK_CRC_VALUE = 10
+  //} PrimaryBlockFields;
+
+  std::string PRIMARY_BLOCK_FIELD_VERSION = "00";
+  std::string PRIMARY_BLOCK_FIELD_BUNDLE_PROCESSING_FLAGS = "01";
+  std::string PRIMARY_BLOCK_FIELD_CRC_TYPE = "02";
+  std::string PRIMARY_BLOCK_FIELD_DESTINATION = "03";
+  std::string PRIMARY_BLOCK_FIELD_SOURCE = "04";
+  std::string PRIMARY_BLOCK_FIELD_REPORT_TO = "05";
+  std::string PRIMARY_BLOCK_FIELD_CREATION_TIMESTAMP = "06";
+  std::string PRIMARY_BLOCK_FIELD_LIFETIME = "07";
+  std::string PRIMARY_BLOCK_FIELD_FRAGMENT_OFFSET = "08";
+  std::string PRIMARY_BLOCK_FIELD_ADU_LENGTH = "09";
+  std::string PRIMARY_BLOCK_FIELD_CRC_VALUE = "10";
 
 private:
-    uint8_t m_version;                      // the version of bundle protocol "version"
-    uint32_t m_blockNumber;                 // block number "block_number"
-    uint64_t m_processingFlags;             // bundle processing control flags "processing_flags"
+    //uint8_t m_version;                      // the version of bundle protocol "version"
+    //uint32_t m_blockNumber;                 // block number "block_number"
+    //uint64_t m_processingFlags;             // bundle processing control flags "processing_flags"
     BpEndpointId m_destEndpointId;          // destination endpoint id "destination"
     BpEndpointId m_sourceEndpointId;        // source endpoint id "source"
     BpEndpointId m_reportToEndPointId;      // report endpoint id "report_to"
-    std::time_t m_creationTimestamp;        // creation time "creation_timestamp" NOTE: Parameter is not correct - TODO: reference Section 4.2.7 of RFC 9171 for proper definition of timestamp
-    uint32_t m_lifetime;                    // lifetime in seconds "lifetime"
-    uint32_t m_fragmentOffset;              // fragementation offset "fragment_offset"
-    uint32_t m_aduLength;                   // application data unit length "adu_length"
-    uint8_t m_crcType;                      // CRC Type "crc_type"
-    uint32_t m_crcValue;                    // CRC of primary block "crc_value"
+    //std::time_t m_creationTimestamp;        // creation time "creation_timestamp" NOTE: Parameter is not correct - TODO: reference Section 4.2.7 of RFC 9171 for proper definition of timestamp
+    //uint32_t m_lifetime;                    // lifetime in seconds "lifetime"
+    //uint32_t m_fragmentOffset;              // fragementation offset "fragment_offset"
+    //uint32_t m_aduLength;                   // application data unit length "adu_length"
+    //uint8_t m_crcType;                      // CRC Type "crc_type"
+    //uint32_t m_crcValue;                    // CRC of primary block "crc_value"
 
     // primary bundle block, section 4.3.1, RFC 9171
     json m_primary_bundle_block;            // primary bundle block

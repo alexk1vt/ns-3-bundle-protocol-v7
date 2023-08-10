@@ -113,7 +113,21 @@ public:
     /**
      * \brief Set the bundle extension block
     */
-    void SetExtensionBlock (const BpCanonicalBlock &extensionBlock);
+    int AddExtensionBlock (const BpCanonicalBlock &extensionBlock);
+
+    int AddUpdateExtensionBlock (const BpCanonicalBlock &extensionBlock);
+    int AddUpdateExtensionBlock (uint8_t blockType, BpEndpointId eid);
+    int AddUpdateExtensionBlock (uint8_t blockType);
+    int AddUpdateExtensionBlock (uint8_t blockType, uint64_t blockProcessingFlags, uint8_t crcType, std::string blockData);
+
+    int AddUpdatePrevNodeExtBlock (BpEndpointId eid);
+    std::string GetPrevNodeExtBlockData ();
+    int AddUpdateBundleAgeExtBlock ();
+    uint64_t GetBundleAgeExtBlockData ();
+    int AddUpdateHopCountExtBlock ();
+    uint64_t GetHopCountExtBlockData ();
+
+    bool HasExtensionBlock (uint8_t blockType);
 
     /**
      * \brief Set the bundle payload block
@@ -123,7 +137,7 @@ public:
     /**
      * \brief Rebuild bundle with currently configured values
     */
-    void RebuildBundle ();
+    //void RebuildBundle ();
 
     /**
      * \brief Deserialize from CBOR encoding
@@ -132,11 +146,12 @@ public:
      */
     int SetBundleFromCbor (const std::vector <std::uint8_t> cborEncoding);
     
-    int AddToBundle(std::string key, BpCanonicalBlock block);
+    int AddToBundle(uint8_t blockIndex, BpCanonicalBlock block);
     int AddBlocksFromBundle(Ptr<BpBundle> donatingBundle);
-    int AddBlocksFromBundle(Ptr<BpBundle> donatingBundle, uint32_t blockNumber);
-    int AddBlocksFromBundleExcept(Ptr<BpBundle> donatingBundle, uint32_t blockNumber);
-    int SetBundleFromJson (Ptr<BpBundle> donorBundle);
+    int AddBlocksFromBundle(Ptr<BpBundle> donatingBundle, BpCanonicalBlock::CanonicalBlockTypeCodes blockType, bool headlessBundle);
+    int AddBlocksFromBundleExcept(Ptr<BpBundle> donatingBundle, BpCanonicalBlock::CanonicalBlockTypeCodes blockType, bool headlessBundle);
+    int SetBundleFromJson (json donatingJson);
+    
 
   // Getters
 
@@ -195,19 +210,24 @@ public:
         return &m_payloadBlock;
     }
 
+    json GetJson ()
+    {
+      return m_bundle;
+    }
+
     /**
      * \brief Get the bundle extension block
      * 
      * \return the bundle extension block  // TODO:  change implementation to support several extension blocks
      */
-    BpCanonicalBlock GetExtensionBlock () const;
+    BpCanonicalBlock GetExtensionBlock (uint8_t blockType);
 
     /**
      * \brief Get the number of bundle extension blocks
      * 
      * \return the number of bundle extension blocks
      */
-    uint8_t GetExtensionBlockCount () const;
+    uint8_t GetExtensionBlockCount ();
 
     /**
      * \brief Get the bundle payload block
@@ -223,6 +243,10 @@ public:
      */
     std::vector <std::uint8_t> GetCborEncoding ();
 
+    // Functions for adding extension blocks to the bundle
+    uint8_t GetNewBlockNumber ();
+    //uint8_t GetNewBlockIndex ();
+
     /**
      * \brief Get the size of the CBOR encoded bundle in bytes
      * 
@@ -230,15 +254,16 @@ public:
      */
     uint GetCborEncodingSize ();
     void PrintCborBytes ();
-    bool empty ();
+    bool empty () const;
+    std::string BlockNumberToString (uint8_t blockNumber);
 
     // TODO:  Add the rest of the getters
 
     /*
     * Iterator operations
     */
-    json::iterator begin();
-    json::iterator end();
+    json::iterator begin ();
+    json::iterator end ();
 
     /*
     * Inline operators
@@ -257,6 +282,17 @@ public:
         BUNDLE_FORWARD_PENDING     = 1 << 1,
         BUNDLE_REASSEMBLY_PENDING  = 1 << 2,
     } BundleRetentionConstraint;
+
+  /*
+  * Bundle Block Index values
+  */
+ //typedef enum {
+ //   BUNDLE_PRIMARY_BLOCK = 0,
+ //   BUNDLE_PAYLOAD_BLOCK = 255
+ //} BundleBlockIndex;
+
+  std::string BUNDLE_PRIMARY_BLOCK = "000";
+  std::string BUNDLE_PAYLOAD_BLOCK = "255";
 
 private:
     uint8_t m_retentionConstraint;          // the bundle retention constraint

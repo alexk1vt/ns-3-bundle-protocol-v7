@@ -41,6 +41,8 @@
 #include <map>
 #include <ctime>
 
+#define RFC_DATE_2000 946684800
+
 NS_LOG_COMPONENT_DEFINE ("BundleProtocol");
 
 namespace ns3 {
@@ -305,6 +307,7 @@ BundleProtocol::Send_data (const uint8_t* data, const uint32_t data_size, const 
   uint32_t total = data_size;
   uint32_t offset = 0;
   bool fragment =  ( total > m_bundleSize ) ? true : false; // TO DO: Move fragmentation to CLA level - only CLA can make appropriate fragmentation decision based on transmitting protocol
+  std::time_t timeStamp = std::time (NULL) - RFC_DATE_2000;
 
   NS_LOG_FUNCTION("Received PDU of size: " << total << "; max bundle size is: " << m_bundleSize << (( total > m_bundleSize ) ? "Fragmenting" : "No Fragmenting"));
 
@@ -319,7 +322,8 @@ BundleProtocol::Send_data (const uint8_t* data, const uint32_t data_size, const 
       bundle->GetPrimaryBlockPtr ()->SetSourceEid (src);
       bundle->GetPrimaryBlockPtr ()->SetLifetime (0);
       bundle->GetPrimaryBlockPtr ()->SetAduLength (data_size); // set the ADU length to the original data size
-  
+      bundle->GetPrimaryBlockPtr ()->SetCreationTimestamp (timeStamp); // ensure each fragment maintains the same creation timestamp
+
       bundle->GetPayloadBlockPtr ()->SetBlockTypeCode (1);
       bundle->GetPayloadBlockPtr ()->SetBlockNumber (1);
 
@@ -335,7 +339,7 @@ BundleProtocol::Send_data (const uint8_t* data, const uint32_t data_size, const 
         }
 
       // Assemble the full bundle
-      bundle->RebuildBundle ();
+      //bundle->RebuildBundle ();
 
       NS_LOG_FUNCTION ("Send bundle:" << " src eid " << bundle->GetPrimaryBlockPtr ()->GetSourceEid ().Uri () << 
                                  " dst eid " << bundle->GetPrimaryBlockPtr ()->GetDestinationEid ().Uri () << 
@@ -380,6 +384,9 @@ BundleProtocol::ForwardBundle (Ptr<BpBundle> bundle)
   NS_LOG_FUNCTION (this << " " << bundle);
   BpPrimaryBlock *bpPrimaryblock = bundle->GetPrimaryBlockPtr();
   BpEndpointId src = bpPrimaryblock->GetSourceEid ();
+
+  // process extension blocks
+  ProcessExtensionBlocks (bundle);
 
   // store the bundle into persistant sent storage
   std::map<BpEndpointId, std::queue<Ptr<BpBundle> > >::iterator it = BpSendBundleStore.end ();
@@ -677,6 +684,9 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
     BpRecvFragMap.erase (FragName);
   }
   
+  // Check for extension blocks
+  ProcessExtensionBlocks (bundle, true); // true indicates we are only printing the extension block contents for informative purposes only
+
   std::map<BpEndpointId, std::queue<Ptr<BpBundle> > >::iterator itMap = BpRecvBundleStore.find (dst);
 
   if ( itMap == BpRecvBundleStore.end ())
@@ -811,6 +821,39 @@ BundleProtocol::GetBundle (const BpEndpointId &src)
     }
 }
 
+
+void
+BundleProtocol::ProcessExtensionBlocks (Ptr<BpBundle> bundle, bool printOnly)
+{
+  NS_LOG_FUNCTION (this << " " << bundle);
+
+  if (printOnly)
+  {
+    if (bundle->HasExtensionBlock(BpCanonicalBlock::BLOCK_TYPE_PREVIOUS_NODE))
+    {
+      std::string prevNodeStr = bundle->GetPrevNodeExtBlockData ();
+      NS_LOG_FUNCTION (this << " Bundle has previous node of: " << prevNodeStr);
+    }
+    if (bundle->HasExtensionBlock(BpCanonicalBlock::BLOCK_TYPE_BUNDLE_AGE))
+    {
+      uint64_t bundleAge = bundle->GetBundleAgeExtBlockData ();
+      NS_LOG_FUNCTION (this << " Bundle has age of: " << bundleAge << " milliseconds");
+    }
+    if (bundle->HasExtensionBlock(BpCanonicalBlock::BLOCK_TYPE_HOP_COUNT))
+    {
+      uint64_t hopCount = bundle->GetHopCountExtBlockData ();
+      NS_LOG_FUNCTION (this << " Bundle has hop count of: " << hopCount);
+    }
+  }
+  else
+  {
+    // Apply extension bundles for forwarding per RFC 9171
+    bundle->AddUpdatePrevNodeExtBlock (m_eid);
+    bundle->AddUpdateBundleAgeExtBlock ();
+    bundle->AddUpdateHopCountExtBlock ();
+    // TODO:  Implement method to delete bundle if extension block thresholds have been reached
+  }
+}
 
 void 
 BundleProtocol::SetBpRegisterInfo (struct BpRegisterInfo info)

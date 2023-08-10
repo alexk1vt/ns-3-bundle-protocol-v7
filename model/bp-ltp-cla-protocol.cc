@@ -665,6 +665,8 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
             else
             {
                 // Assemble the bundle and send up to bundle protocol
+                std::vector <uint8_t> assembledData (RcvIt->second.redData);
+                /*
                 std::vector <uint8_t> assembledData;
                 if (RcvIt->second.rcvRedDataLength > 0)
                 {
@@ -675,6 +677,7 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
                         assembledData.push_back(*i);
                     }
                 }
+                */
                 if (RcvIt->second.rcvGreenDataLength > 0)
                 {
                     NS_LOG_FUNCTION (this << "Green Data Received for SessionId " << id.GetSessionNumber () << " with length " << RcvIt->second.greenData.size() << " bytes (declared size of " << RcvIt->second.rcvGreenDataLength << " bytes)");
@@ -740,12 +743,12 @@ BpLtpClaProtocol::SplitBundle (Ptr<BpBundle> bundle, RedDataModes redDataMode, u
     {
         // iterate through json fields looking for block with block number 0 (primary block)
         //splitBundle->SetPrimaryBlock(&(bundle->GetPrimaryBlock ()));
-        if (splitBundle->AddBlocksFromBundle(bundle, 0) < 0) // 0 is block number for primary block
+        if (splitBundle->AddBlocksFromBundle(bundle, BpCanonicalBlock::BLOCK_TYPE_PRIMARY, false) < 0) // 0 is block number for primary block
         {
             NS_LOG_FUNCTION (this << " Unable to get primary block from original bundle. Unable to send");
             return std::vector<uint8_t> ();
         }
-        if (greenBundle->AddBlocksFromBundleExcept(bundle, 0) < 0) // 0 is block number for primary block
+        if (greenBundle->AddBlocksFromBundleExcept(bundle, BpCanonicalBlock::BLOCK_TYPE_PRIMARY, false) < 0) // 0 is block number for primary block
         {
             NS_LOG_FUNCTION (this << " Unable to get non-primary blocks from original bundle. Unable to send");
             return std::vector<uint8_t> ();
@@ -753,17 +756,18 @@ BpLtpClaProtocol::SplitBundle (Ptr<BpBundle> bundle, RedDataModes redDataMode, u
     }
     else // RED_DATA_ROBUST
     {
-        if (splitBundle->AddBlocksFromBundleExcept(bundle, 1) < 0) // 1 is block number for payload block
+        if (splitBundle->AddBlocksFromBundleExcept(bundle, BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, false) < 0) // 1 is block number for payload block
         {
             NS_LOG_FUNCTION (this << " Unable to get all blocks except payload from original bundle. Unable to send");
             return std::vector<uint8_t> ();
         }
-        if (greenBundle->AddBlocksFromBundle(bundle, 1) < 0) // 1 is block number for payload block
+        if (greenBundle->AddBlocksFromBundle(bundle, BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, false) < 0) // 1 is block number for payload block
         {
             NS_LOG_FUNCTION (this << " Unable to get payload block from original bundle. Unable to send");
             return std::vector<uint8_t> ();
         }
     }
+
     // Split bundles created, now generate CBOR vectors and combine
     std::vector<uint8_t> splitVector = splitBundle->GetCborEncoding ();
     std::vector<uint8_t> greenVector = greenBundle->GetCborEncoding ();
@@ -825,7 +829,7 @@ BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
         //}
         // red and green data combined into redBundle
         //bundle = redBundle;
-        bundle->SetBundleFromJson (redBundle);
+        bundle->SetBundleFromJson (redBundle->GetJson ());
         NS_LOG_FUNCTION (this << " Bundle assembled from both red and green parts; bundle payload has size: " << bundle->GetPayloadBlockPtr ()->GetBlockDataSize () << " bytes");
     }
     else
