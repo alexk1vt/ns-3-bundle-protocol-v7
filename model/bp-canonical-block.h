@@ -102,7 +102,7 @@ public:
      * 
      * \param crc the CRC of the primary block
      */
-    void SetCrc (uint32_t crc);
+    void SetCrcValue (uint32_t crc);
 
     /**
      * \brief Set the block data
@@ -147,7 +147,8 @@ public:
     /**
      * \return The CRC of the primary block (only if CRC Type is not 0)
      */
-    uint32_t GetCrcValue () const;
+    uint16_t GetCrc16Value () const;
+    uint32_t GetCrc32Value () const;
 
     /**
      * \return The block data
@@ -167,9 +168,16 @@ public:
     /**
      * \return The calculated CRC value of this block
     */
-    uint32_t CalcCrcValue () const;
+    uint16_t CalcCrc16Value ();
+    uint32_t CalcCrc32Value ();
+    bool CheckCrcValue ();
+    uint16_t CalcCrc16Slow (uint8_t const message[], uint32_t nBytes);
+    
+    int GenerateCrcValue ();
 
     bool IsEmpty () const;
+
+    void DumpAllButPayload() const;
 
     // TODO:  Add the rest of the getters
 

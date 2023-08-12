@@ -267,17 +267,19 @@ public:
     /**
      * \return The CRC of the primary block (only if CRC Type is not 0)
      */
-    uint32_t GetCrcValue () const;
+    uint32_t GetCrc32Value () const;
+    uint16_t GetCrc16Value () const;
+
+    int GenerateCrcValue ();
+    uint16_t CalcCrc16Value (); // overwrites existing CRC value
+    uint32_t CalcCrc32Value (); // overwrites existing CRC value
+    bool CheckCrcValue (); // false for mismatch/calculation error; true for crc match
+    uint16_t CalcCrc16Slow (uint8_t const message[], uint32_t nBytes);
 
     /**
      * \return The primary bundle block JSON
      */
     json GetJson () const;
-
-    /**
-     * \return The calculated CRC value of this block
-    */
-    uint32_t CalcCrcValue () const;
 
     // TODO:  Add the rest of the getters
 

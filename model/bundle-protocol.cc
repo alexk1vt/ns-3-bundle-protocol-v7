@@ -308,6 +308,7 @@ BundleProtocol::Send_data (const uint8_t* data, const uint32_t data_size, const 
   uint32_t offset = 0;
   bool fragment =  ( total > m_bundleSize ) ? true : false; // TO DO: Move fragmentation to CLA level - only CLA can make appropriate fragmentation decision based on transmitting protocol
   std::time_t timeStamp = std::time (NULL) - RFC_DATE_2000;
+  uint8_t crcType = 1; // CRC-16
 
   NS_LOG_FUNCTION("Received PDU of size: " << total << "; max bundle size is: " << m_bundleSize << (( total > m_bundleSize ) ? "Fragmenting" : "No Fragmenting"));
 
@@ -323,9 +324,11 @@ BundleProtocol::Send_data (const uint8_t* data, const uint32_t data_size, const 
       bundle->GetPrimaryBlockPtr ()->SetLifetime (0);
       bundle->GetPrimaryBlockPtr ()->SetAduLength (data_size); // set the ADU length to the original data size
       bundle->GetPrimaryBlockPtr ()->SetCreationTimestamp (timeStamp); // ensure each fragment maintains the same creation timestamp
+      bundle->GetPrimaryBlockPtr ()->SetCrcType (crcType); // set the CRC type to CRC-16
 
       bundle->GetPayloadBlockPtr ()->SetBlockTypeCode (1);
       bundle->GetPayloadBlockPtr ()->SetBlockNumber (1);
+      bundle->GetPayloadBlockPtr ()->SetCrcType (crcType); // set the CRC type to CRC-16
 
       if (fragment)
         {
@@ -346,6 +349,9 @@ BundleProtocol::Send_data (const uint8_t* data, const uint32_t data_size, const 
                                  " payload size " << bundle->GetPayloadBlockPtr ()->GetBlockDataSize () <<
                                  " serialized bundle size " << bundle->GetCborEncodingSize ());
 
+      // Generate the CRC values
+      bundle->GetPrimaryBlockPtr ()->GenerateCrcValue ();
+      bundle->GetPayloadBlockPtr ()->GenerateCrcValue ();
       // store the bundle into persistant sent storage
       std::map<BpEndpointId, std::queue<Ptr<BpBundle> > >::iterator it = BpSendBundleStore.end ();
       it = BpSendBundleStore.find (src);
@@ -501,6 +507,17 @@ BundleProtocol::RetreiveBundle ()
   {
     Ptr<BpBundle> bundle = m_bpRxBundleQueue.front ();
     m_bpRxBundleQueue.pop ();
+    if (!bundle->GetPrimaryBlockPtr ()->CheckCrcValue ())
+    {
+      NS_LOG_FUNCTION (this << " Primary Block CRC check failed.  Dropping bundle");
+      return;
+    }
+    //bundle->GetPayloadBlockPtr ()->DumpAllButPayload ();
+    if (!bundle->GetPayloadBlockPtr ()->CheckCrcValue ())
+    {
+      NS_LOG_FUNCTION (this << " Payload Block CRC check failed.  Dropping bundle");
+      return;
+    }
     ProcessBundle (bundle); // now process the bundle and perform follow-on actions
     Simulator::ScheduleNow (&BundleProtocol::RetreiveBundle, this); // see if there are any additional bundles to process
   }

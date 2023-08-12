@@ -151,7 +151,8 @@ public:
     int AddBlocksFromBundle(Ptr<BpBundle> donatingBundle, BpCanonicalBlock::CanonicalBlockTypeCodes blockType, bool headlessBundle);
     int AddBlocksFromBundleExcept(Ptr<BpBundle> donatingBundle, BpCanonicalBlock::CanonicalBlockTypeCodes blockType, bool headlessBundle);
     int SetBundleFromJson (json donatingJson);
-    
+
+    int AddCRCToBundle(uint8_t crcType);    
 
   // Getters
 
@@ -208,6 +209,10 @@ public:
     BpCanonicalBlock *GetPayloadBlockPtr ()
     {
         return &m_payloadBlock;
+        //BpCanonicalBlock payloadBlock;
+        //payloadBlock.SetCanonicalBlockFromJson(m_bundle[BUNDLE_PAYLOAD_BLOCK]);
+        //m_payloadBlock = payloadBlock;
+        //return &m_payloadBlock;
     }
 
     json GetJson ()
@@ -256,6 +261,11 @@ public:
     void PrintCborBytes ();
     bool empty () const;
     std::string BlockNumberToString (uint8_t blockNumber);
+
+    /*
+    * CRC operations
+    */
+    int AddCrcToBundle(uint8_t crcType);
 
     // TODO:  Add the rest of the getters
 

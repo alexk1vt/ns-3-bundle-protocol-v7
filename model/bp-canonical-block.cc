@@ -24,6 +24,7 @@
 #include "ns3/log.h"
 #include "ns3/node.h"
 #include "bp-canonical-block.h"
+//#include "bp-crc.h"
 #include <stdio.h>
 #include <string>
 
@@ -176,6 +177,13 @@ BpCanonicalBlock::SetCrcType (uint8_t crcType)
 }
 
 void
+BpCanonicalBlock::SetCrcValue (uint32_t crc)
+{
+    NS_LOG_FUNCTION (this << crc);
+    m_canonical_block[CANONICAL_BLOCK_FIELD_CRC_VALUE] = crc;
+}
+
+void
 BpCanonicalBlock::SetBlockData (std::string data)
 {
     NS_LOG_FUNCTION (this << data);
@@ -225,10 +233,27 @@ BpCanonicalBlock::GetCrcType () const
     return m_canonical_block[CANONICAL_BLOCK_FIELD_CRC_TYPE];
 }
 
-uint32_t
-BpCanonicalBlock::GetCrcValue () const
+uint16_t
+BpCanonicalBlock::GetCrc16Value () const
 {
     NS_LOG_FUNCTION (this);
+    if (!m_canonical_block.contains (CANONICAL_BLOCK_FIELD_CRC_VALUE))
+    {
+        NS_LOG_FUNCTION (this << " CRC value field not present in canonical block");
+        return 0;
+    }
+    return m_canonical_block[CANONICAL_BLOCK_FIELD_CRC_VALUE];
+}
+
+uint32_t
+BpCanonicalBlock::GetCrc32Value () const
+{
+    NS_LOG_FUNCTION (this);
+    if (!m_canonical_block.contains (CANONICAL_BLOCK_FIELD_CRC_VALUE))
+    {
+        NS_LOG_FUNCTION (this << " CRC value field not present in canonical block");
+        return 0;
+    }
     return m_canonical_block[CANONICAL_BLOCK_FIELD_CRC_VALUE];
 }
 
@@ -256,15 +281,202 @@ BpCanonicalBlock::GetJson () const
     return m_canonical_block;
 }
 
-uint32_t
-BpCanonicalBlock::CalcCrcValue () const // TODO:  Implement this!
+void
+BpCanonicalBlock::DumpAllButPayload () const
 {
     NS_LOG_FUNCTION (this);
+    uint16_t crc16Value = 0;
+    uint32_t crc32Value = 0;
+    uint8_t blockTypeCode = GetBlockTypeCode ();
+    uint32_t blockNumber = GetBlockNumber ();
+    uint64_t blockProcessingFlags = GetBlockProcessingFlags ();
+    uint8_t crcType = GetCrcType ();
+    if (crcType == 1)
+    {
+        uint16_t crc16Value = GetCrc16Value ();
+    }
+    else if (crcType == 2)
+    {
+        uint32_t crc32Value = GetCrc32Value ();
+    }
+    NS_LOG_FUNCTION ("  Block Type Code: " << blockTypeCode);
+    NS_LOG_FUNCTION ("  Block Number: " << blockNumber);
+    NS_LOG_FUNCTION ("   Block Processing Flags: " << blockProcessingFlags);
+    NS_LOG_FUNCTION ("   CRC Type: " << (int) crcType);
+    if (crcType == 1)
+    {
+        NS_LOG_FUNCTION ("  CRC Value: " << crc16Value);
+    }
+    else if (crcType == 2)
+    {
+        NS_LOG_FUNCTION ("  CRC Value: " << crc32Value);
+    }
+}
+
+int
+BpCanonicalBlock::GenerateCrcValue ()
+{
+    NS_LOG_FUNCTION (this);
+    uint8_t crcType = GetCrcType ();
+    NS_LOG_FUNCTION (this << " CRC type: " << crcType);
+    if (crcType == 0)
+    {
+        SetCrcValue (0);
+        return 0;
+    }
+    else if (crcType == 1)
+    {
+        uint16_t crcValue = CalcCrc16Value ();
+        if (crcValue == 0)
+        {
+            NS_LOG_FUNCTION (this << " CRC calculation error");
+            return -1;
+        }
+        SetCrcValue (crcValue);
+    }
+    else if (crcType == 2)
+    {
+        uint32_t crcValue = CalcCrc32Value ();
+        if (crcValue == 0)
+        {
+            NS_LOG_FUNCTION (this << " CRC calculation error");
+            return -1;
+        }
+        SetCrcValue (crcValue);
+    }
+    else
+    {
+        NS_LOG_FUNCTION (this << " CRC type not supported");
+        return -1;
+    }
+    return 0;
+    
+}
+
+uint16_t
+BpCanonicalBlock::CalcCrc16Value (void)
+{
+    NS_LOG_FUNCTION (this);
+
+    //SetCrcType (1); // 1 for CRC16
+    uint16_t oldCrcValue = GetCrc16Value ();
+    SetCrcValue (0); // Initialize CRC value to 0 for calculation
     std::vector <std::uint8_t> m_canonical_block_cbor_encoding = json::to_cbor(m_canonical_block); // CBOR encoding of the primary bundle block -- needed for CRC calculation
+    uint32_t cborSize = m_canonical_block_cbor_encoding.size ();
+    if (cborSize == 0)
+    {
+        return 0;
+    }
+    uint8_t *cborData = &m_canonical_block_cbor_encoding[0];
+    uint8_t dataBuffer[cborSize];
+    std::memcpy(dataBuffer, cborData, cborSize);
+    //uint16_t crcValue = crcSlow(dataBuffer, cborSize);
+    uint16_t crcValue = CalcCrc16Slow (dataBuffer, cborSize);
+    SetCrcValue (oldCrcValue); // Restore original CRC value
+    return crcValue;
+
+    // TODO:  Implement CRC calculation
     // remove CRC value from field (if present) (replace with zeros), then encode block in CBOR
     // calculate CRC value based on CRC type from CBOR encoding
     // restore original CrcValue to field and return newly calculated CRC value
+    //return 0;
+}
+
+uint16_t
+BpCanonicalBlock::CalcCrc16Slow (uint8_t const message[], uint32_t nBytes)
+{
+    NS_LOG_FUNCTION (this);
+    //const char CRC_NAME[] =		"CRC-CCITT";
+    //int32_t POLYNOMIAL =		0x1021; //
+    //int32_t INITIAL_REMAINDER =	0xFFFF; //
+    //int32_t FINAL_XOR_VALUE =	0x0000; //
+    //int32_t REFLECT_DATA =  	FALSE; //
+    //int32_t REFLECT_REMAINDER =	FALSE; //
+    //int32_t CHECK_VALUE =		0x29B1;
+
+    uint16_t remainder = 0xFFFF;
+    uint32_t byte = 0;
+    uint8_t bit = 0;
+
+    /*
+     * Perform modulo-2 division, a byte at a time.
+     */
+    for (byte = 0; byte < nBytes; ++byte)
+    {
+        /*
+         * Bring the next byte into the remainder.
+         */
+        remainder ^= (message[byte] << ((8 * sizeof(uint16_t)) - 8));
+
+        /*
+         * Perform modulo-2 division, a bit at a time.
+         */
+        for (bit = 8; bit > 0; --bit)
+        {
+            /*
+             * Try to divide the current data bit.
+             */
+            if (remainder & (1 << ((8 * sizeof(uint16_t)) - 1)))
+            {
+                remainder = (remainder << 1) ^ 0x1021;
+            }
+            else
+            {
+                remainder = (remainder << 1);
+            }
+        }
+    }
+
+    /*
+     * The final remainder is the CRC result.
+     */
+    return (remainder ^ 0x0000);
+}   
+
+uint32_t
+BpCanonicalBlock::CalcCrc32Value ()
+{
+    NS_LOG_FUNCTION (this);
+    // TODO:  Implement CRC32 calculation
     return 0;
+}
+
+bool
+BpCanonicalBlock::CheckCrcValue () // false for mismatch/calculation error; true for crc match
+{
+    NS_LOG_FUNCTION (this);
+    if (!m_canonical_block.contains (CANONICAL_BLOCK_FIELD_CRC_VALUE))
+    {
+        NS_LOG_FUNCTION (this << " CRC value field not present in canonical block");
+        return false;
+    }
+    uint8_t crcType = GetCrcType ();
+    if (crcType == 0)
+    {
+        NS_LOG_FUNCTION (this << " No CRC value set for canonical block");
+        return true;
+    }
+    else if (crcType == 1)
+    {
+        uint16_t crcValue = GetCrc16Value ();
+        uint16_t newCrcValue = CalcCrc16Value ();
+        if (crcValue == newCrcValue)
+        {
+            return true;
+        }
+        NS_LOG_FUNCTION (this << " CRC16 mismatch: original: " << crcValue << " != fresh: " << newCrcValue);
+        return false;
+    }
+    else if (crcType == 2)
+    {
+        NS_LOG_FUNCTION (this << " CRC32 not yet implemented");
+        return false;
+    }
+    else
+    {
+        NS_LOG_FUNCTION (this << " CRC type not supported");
+        return false;
+    }
 }
 
 bool

@@ -24,6 +24,7 @@
 #include "ns3/log.h"
 #include "ns3/node.h"
 #include "bp-primary-block.h"
+//#include "bp-crc.h"
 #include <stdio.h>
 #include <string>
 
@@ -209,8 +210,6 @@ BpPrimaryBlock::SetIsFragment (bool isFragment)
     {
         m_primary_bundle_block[PRIMARY_BLOCK_FIELD_BUNDLE_PROCESSING_FLAGS] = m_primary_bundle_block[PRIMARY_BLOCK_FIELD_BUNDLE_PROCESSING_FLAGS].get<uint64_t> () & ~static_cast<uint64_t>(BundleProcessingFlags::BUNDLE_IS_FRAGMENT);
     }
-    //DEBUG
-    NS_LOG_FUNCTION (this << "Bundle processing flags: " << m_primary_bundle_block[PRIMARY_BLOCK_FIELD_BUNDLE_PROCESSING_FLAGS]);
 }
 
 void
@@ -437,9 +436,27 @@ BpPrimaryBlock::GetCrcType () const
 }
 
 uint32_t
-BpPrimaryBlock::GetCrcValue () const
+BpPrimaryBlock::GetCrc32Value () const
 {
     NS_LOG_FUNCTION (this);
+    if (!m_primary_bundle_block.contains(PRIMARY_BLOCK_FIELD_CRC_VALUE))
+    {
+        NS_LOG_FUNCTION (this << " CRC value field not present in primary block");
+        return 0;
+    }
+    return m_primary_bundle_block[PRIMARY_BLOCK_FIELD_CRC_VALUE];
+    // can test whether CRC value was previously calculated by checking if this returns 0
+}
+
+uint16_t
+BpPrimaryBlock::GetCrc16Value () const
+{
+    NS_LOG_FUNCTION (this);
+    if (!m_primary_bundle_block.contains(PRIMARY_BLOCK_FIELD_CRC_VALUE))
+    {
+        NS_LOG_FUNCTION (this << " CRC value field not present in primary block");
+        return 0;
+    }
     return m_primary_bundle_block[PRIMARY_BLOCK_FIELD_CRC_VALUE];
     // can test whether CRC value was previously calculated by checking if this returns 0
 }
@@ -451,16 +468,169 @@ BpPrimaryBlock::GetJson () const
     return m_primary_bundle_block;
 }
 
-uint32_t
-BpPrimaryBlock::CalcCrcValue () const
+int
+BpPrimaryBlock::GenerateCrcValue ()
 {
     NS_LOG_FUNCTION (this);
+    uint8_t crcType = GetCrcType ();
+    NS_LOG_FUNCTION (this << " CRC type: " << crcType);
+    if (crcType == 0)
+    {
+        SetCrcValue (0);
+        return 0;
+    }
+    else if (crcType == 1)
+    {
+        uint16_t crcValue = CalcCrc16Value ();
+        if (crcValue == 0)
+        {
+            NS_LOG_FUNCTION (this << " CRC calculation error");
+            return -1;
+        }
+        SetCrcValue (crcValue);
+    }
+    else if (crcType == 2)
+    {
+        uint32_t crcValue = CalcCrc32Value ();
+        if (crcValue == 0)
+        {
+            NS_LOG_FUNCTION (this << " CRC calculation error");
+            return -1;
+        }
+        SetCrcValue (crcValue);
+    }
+    else
+    {
+        NS_LOG_FUNCTION (this << " CRC type not supported");
+        return -1;
+    }
+    return 0;
+    
+}
+
+uint16_t
+BpPrimaryBlock::CalcCrc16Value (void)
+{
+    NS_LOG_FUNCTION (this);
+
+    //SetCrcType (1); // 1 for CRC16
+    uint16_t oldCrcValue = GetCrc16Value ();
+    SetCrcValue (0); // Initialize CRC value to 0 for calculation
     std::vector <std::uint8_t> m_primary_block_cbor_encoding = json::to_cbor(m_primary_bundle_block); // CBOR encoding of the primary bundle block -- needed for CRC calculation
+    uint32_t cborSize = m_primary_block_cbor_encoding.size ();
+    if (cborSize == 0)
+    {
+        return 0;
+    }
+    uint8_t *cborData = &m_primary_block_cbor_encoding[0];
+    uint8_t dataBuffer[cborSize];
+    std::memcpy(dataBuffer, cborData, cborSize);
+    uint16_t crcValue = CalcCrc16Slow(dataBuffer, cborSize);
+
+    SetCrcValue (oldCrcValue); // restore original CrcValue to field
+    return crcValue;
+
     // TODO:  Implement CRC calculation
     // remove CRC value from field (if present) (replace with zeros), then encode block in CBOR
     // calculate CRC value based on CRC type from CBOR encoding
     // restore original CrcValue to field and return newly calculated CRC value
+    //return 0;
+}
+
+uint16_t
+BpPrimaryBlock::CalcCrc16Slow (uint8_t const message[], uint32_t nBytes)
+{
+    NS_LOG_FUNCTION (this);
+    //const char CRC_NAME[] =		"CRC-CCITT";
+    //int32_t POLYNOMIAL =		0x1021; //
+    //int32_t INITIAL_REMAINDER =	0xFFFF; //
+    //int32_t FINAL_XOR_VALUE =	0x0000; //
+    //int32_t REFLECT_DATA =  	FALSE; //
+    //int32_t REFLECT_REMAINDER =	FALSE; //
+    //int32_t CHECK_VALUE =		0x29B1;
+
+    uint16_t remainder = 0xFFFF;
+    uint32_t byte = 0;
+    uint8_t bit = 0;
+
+    /*
+     * Perform modulo-2 division, a byte at a time.
+     */
+    for (byte = 0; byte < nBytes; ++byte)
+    {
+        /*
+         * Bring the next byte into the remainder.
+         */
+        remainder ^= (message[byte] << ((8 * sizeof(uint16_t)) - 8));
+
+        /*
+         * Perform modulo-2 division, a bit at a time.
+         */
+        for (bit = 8; bit > 0; --bit)
+        {
+            /*
+             * Try to divide the current data bit.
+             */
+            if (remainder & (1 << ((8 * sizeof(uint16_t)) - 1)))
+            {
+                remainder = (remainder << 1) ^ 0x1021;
+            }
+            else
+            {
+                remainder = (remainder << 1);
+            }
+        }
+    }
+
+    /*
+     * The final remainder is the CRC result.
+     */
+    return (remainder ^ 0x0000);
+}   
+
+uint32_t
+BpPrimaryBlock::CalcCrc32Value ()
+{
+    NS_LOG_FUNCTION (this);
+    // TODO:  Implement CRC32 calculation
     return 0;
+}
+
+bool
+BpPrimaryBlock::CheckCrcValue () // false for mismatch/calculation error; true for crc match
+{
+    NS_LOG_FUNCTION (this);
+    if (!m_primary_bundle_block.contains (PRIMARY_BLOCK_FIELD_CRC_VALUE))
+    {
+        NS_LOG_FUNCTION (this << " CRC value field not present in primary block");
+        return false;
+    }
+    uint8_t crcType = m_primary_bundle_block[PRIMARY_BLOCK_FIELD_CRC_TYPE];
+    if (crcType == 0)
+    {
+        NS_LOG_FUNCTION (this << " No CRC value set for primary block");
+        return true;
+    }
+    else if (crcType == 1)
+    {
+        uint16_t crcValue = GetCrc16Value ();
+        uint16_t newCrcValue = CalcCrc16Value ();
+        if (crcValue == newCrcValue)
+        {
+            return true;
+        }
+        return false;
+    }
+    else if (crcType == 2)
+    {
+        NS_LOG_FUNCTION (this << " CRC32 not yet implemented");
+        return false;
+    }
+    else
+    {
+        NS_LOG_FUNCTION (this << " CRC type not supported");
+        return false;
+    }
 }
     
 } // namespace ns3

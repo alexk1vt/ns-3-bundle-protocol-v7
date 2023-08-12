@@ -593,7 +593,27 @@ BpBundle::AddBlocksFromBundle(Ptr<BpBundle> donatingBundle)
     {
         try
         {
-            m_bundle[it.key ()] = it.value ();
+            //m_bundle[it.key ()] = it.value ();
+            if (it.key () == BUNDLE_PRIMARY_BLOCK)
+            {
+                //SetPrimaryBlock(donatingBundle->GetPrimaryBlock());
+                BpPrimaryBlock primaryBlock;
+                primaryBlock.SetPrimaryBlockFromJson (it.value ());
+                SetPrimaryBlock(primaryBlock);
+            }
+            else if (it.key () == BUNDLE_PAYLOAD_BLOCK)
+            {
+                //SetPayloadBlock(donatingBundle->GetPayloadBlock());
+                BpCanonicalBlock payloadBlock;
+                payloadBlock.SetCanonicalBlockFromJson (it.value ());
+                SetPayloadBlock(payloadBlock);
+            }
+            else
+            {
+                BpCanonicalBlock extensionBlock;
+                extensionBlock.SetCanonicalBlockFromJson (it.value ());
+                AddExtensionBlock(extensionBlock);
+            }
         }
         catch (const std::exception& e)
         {
@@ -673,7 +693,8 @@ BpBundle::AddBlocksFromBundleExcept(Ptr<BpBundle> donatingBundle, BpCanonicalBlo
     {
         try
         {
-            m_bundle[BpBundle::BUNDLE_PRIMARY_BLOCK] = donatingBundle->m_bundle[BpBundle::BUNDLE_PRIMARY_BLOCK];
+            //m_bundle[BpBundle::BUNDLE_PRIMARY_BLOCK] = donatingBundle->m_bundle[BpBundle::BUNDLE_PRIMARY_BLOCK];
+            SetPrimaryBlock(donatingBundle->GetPrimaryBlock());
         }
         catch (const std::exception& e)
         {
@@ -704,14 +725,18 @@ BpBundle::AddBlocksFromBundleExcept(Ptr<BpBundle> donatingBundle, BpCanonicalBlo
             {
                 if (itBlockType == BpCanonicalBlock::BLOCK_TYPE_PAYLOAD)
                 {
-                    m_bundle[BUNDLE_PAYLOAD_BLOCK] = it.value ();
+                    //m_bundle[BUNDLE_PAYLOAD_BLOCK] = it.value ();
+                    SetPayloadBlock(donatingBundle->GetPayloadBlock());
                 }
                 else
                 {
-                    uint8_t blockNumber = GetNewBlockNumber ();
-                    std::string blockNumberStr = BlockNumberToString(blockNumber);
-                    m_bundle[blockNumberStr] = it.value ();
-                    m_bundle[blockNumberStr][CANONICAL_BLOCK_FIELD_BLOCK_NUMBER] = blockNumber;
+                    //uint8_t blockNumber = GetNewBlockNumber ();
+                    //std::string blockNumberStr = BlockNumberToString(blockNumber);
+                    //m_bundle[blockNumberStr] = it.value ();
+                    //m_bundle[blockNumberStr][CANONICAL_BLOCK_FIELD_BLOCK_NUMBER] = blockNumber;
+                    BpCanonicalBlock extBlock;
+                    extBlock.SetCanonicalBlockFromJson (it.value ());
+                    AddExtensionBlock(extBlock);
                 }
             }
             catch (const std::exception& e)
@@ -789,6 +814,52 @@ BpBundle::SetBundleFromJson (json donatingJson)
         }
     }
     return 0;
+}
+
+int
+BpBundle::AddCrcToBundle(uint8_t crcType)
+{
+    NS_LOG_FUNCTION (this);
+    if (crcType == 1) // CRC-16
+    {
+        // Generate a CRC for all blocks in the bundle
+        for (json::iterator it = begin (); it != end (); ++it)
+        {
+            if (it.value ().is_null ())
+            {
+                continue;
+            }
+            if (it.key () == BUNDLE_PRIMARY_BLOCK)
+            {
+                BpPrimaryBlock primaryBlock;
+                primaryBlock.SetPrimaryBlockFromJson (it.value ());
+                if (primaryBlock.GenerateCrcValue() < 0)
+                {
+                    NS_LOG_FUNCTION (this << "Unable to set CRC value for Primary Block");
+                    return -1;
+                }
+                m_bundle[BUNDLE_PRIMARY_BLOCK] = primaryBlock.GetJson ();
+            }
+            else
+            {
+                BpCanonicalBlock canonicalBlock;
+                canonicalBlock.SetCanonicalBlockFromJson (it.value ());
+                if (canonicalBlock.GenerateCrcValue() < 0)
+                {
+                    NS_LOG_FUNCTION (this << "Unable to set CRC value for canonicalBlock Block");
+                    return -1;
+                }
+                uint8_t blockNumber = canonicalBlock.GetBlockNumber();
+                m_bundle[BlockNumberToString(blockNumber)] = canonicalBlock.GetJson ();
+            }
+        }
+        return 0;
+    }
+    else
+    {
+        NS_LOG_FUNCTION (this << " CRC type: " << crcType << " is not supported.");
+        return -1;
+    }
 }
 
 uint8_t
