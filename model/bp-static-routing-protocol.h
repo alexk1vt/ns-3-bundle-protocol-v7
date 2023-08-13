@@ -56,15 +56,19 @@ public:
    * \brief Add a static route 
    */
   virtual int AddRoute (BpEndpointId eid, BpEndpointId next_hop);
+  int AddAltRoute (BpEndpointId eid, BpEndpointId next_hop);
+  bool HasAltRoute (BpEndpointId eid);
 
   /**
    *  \return the internet socket address of matched eid; If there is no 
    *  match route, return the 127.0.0.1 with port 0
    */
   virtual BpEndpointId GetRoute (BpEndpointId eid);
+  BpEndpointId GetAltRoute (BpEndpointId eid);
 
 private:
   std::map <BpEndpointId, BpEndpointId> m_routeMap; /// routing table
+  std::map <BpEndpointId, BpEndpointId> m_altRouteMap // Alternate routing table
   Ptr<BundleProtocol> m_bp;                              /// bundle protocol
 };
 

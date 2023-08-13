@@ -207,6 +207,7 @@ BpLtpClaProtocol::AddBundleToTxQueue (std::vector<uint8_t> cborBundle, uint64_t 
     txQueueVals.redSize = redSize;
     txQueueVals.dstLtpEngineId = dstLtpEngineId;
     txQueueVals.cborBundle = cborBundle;
+    txQueueVals.primaryRoute = true;
     
     std::map<uint64_t, std::deque<TxQueueVals> >::iterator it = m_txQueueMap.find (dstLtpEngineId);
     if (it == m_txQueueMap.end ())
@@ -1034,10 +1035,14 @@ BpLtpClaProtocol::ConnectionRequestFailedCallback (Ptr<Socket> socket)
     NS_LOG_FUNCTION (this << socket);
     socket->Close();
     // Connection request failed, so need to wait for linkstatuschange callback
-    Address address;
-    socket->GetSockName (address);
-    InetSocketAddress destAddr = InetSocketAddress::ConvertFrom (address);
-    uint64_t dstLtpEngineId = m_ltp->GetBindingFromIpv4Addr (destAddr);
+    std::map<Ptr<Socket>, uint64_t>::iterator it = m_socketToLtpEngineId.find(socket);
+    if (it == m_socketToLtpEngineId.end ())
+    {
+        NS_LOG_FUNCTION (this << "Unable to find socket in m_socketToLtpEngineId");
+        return;
+    }
+    uint64_t dstLtpEngineId = it->second;
+    m_socketToLtpEngineId.erase(socket);
 
     std::map<uint64_t, std::deque<TxQueueVals> >::iterator it = m_txQueueMap.find (dstLtpEngineId);
     if (it != m_txQueueMap.end ())

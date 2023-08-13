@@ -127,7 +127,8 @@ private:
     Ptr<BpBundle> AssembleBundle (std::vector<uint8_t> data, uint64_t redSize);
 
     void StartTransmission (Ptr<BpBundle> bundle, BpEndpointId nextHopEid, uint64_t nextHopEngineId, uint64_t redSize);
-    void AddBundleToTxQueue (std::vector<uint8_t> cborBundle, uint64_t dstLtpEngineId, uint64_t redSize);
+    int ProcessBundleForTxQueue (Ptr<BpBundle> bundle, bool primaryRoute);
+    void AddBundleToTxQueue (std::vector<uint8_t> cborBundle, uint64_t dstLtpEngineId, uint64_t redSize, bool primaryRoute);
     void SendBundleFromTxQueue (uint64_t dstLtpEngineId);
     void CheckForBundleToSendFromTxQueue(LinkWaitingStatus waitStatus);
     int SendIfLinkUp (uint64_t destLtpEngineId);
@@ -156,6 +157,7 @@ private:
         uint64_t dstLtpEngineId;
         std::vector<uint8_t> cborBundle;
         LinkWaitingStatus waitStatus;
+        bool primaryRoute;
 
     };
 

@@ -76,6 +76,24 @@ BpStaticRoutingProtocol::AddRoute (BpEndpointId eid, BpEndpointId next_hop) // -
   return 0;
 }
 
+int 
+BpStaticRoutingProtocol::AddAltRoute (BpEndpointId eid, BpEndpointId next_hop) // -- setting the next hop node for target node
+{ 
+  NS_LOG_FUNCTION (this << " " << eid.Uri () << " " << next_hop.Uri ());
+  std::map <BpEndpointId, BpEndpointId>::iterator it = m_altRouteMap.find (eid);
+  if (it == m_altRouteMap.end ())
+    {
+      m_altRouteMap.insert (std::pair<BpEndpointId, BpEndpointId>(eid, next_hop));
+    }
+  else
+    {
+      // duplicate routing
+      return -1;
+    }
+
+  return 0;
+}
+
 //InetSocketAddress 
 BpEndpointId
 BpStaticRoutingProtocol::GetRoute (BpEndpointId eid)
@@ -89,6 +107,36 @@ BpStaticRoutingProtocol::GetRoute (BpEndpointId eid)
   else
     {
       return (*it).second;
+    }
+}
+
+BpEndpointId
+BpStaticRoutingProtocol::GetAltRoute (BpEndpointId eid)
+{ 
+  NS_LOG_FUNCTION (this << " " << eid.Uri ());
+  std::map <BpEndpointId, BpEndpointId>::iterator it = m_altRouteMap.find (eid);
+  if (it == m_altRouteMap.end ())
+    {
+      return eid;
+    }
+  else
+    {
+      return (*it).second;
+    }
+}
+
+bool
+BpStaticRoutingProtocol::HasAltRoute (BpEndpointId eid)
+{
+  NS_LOG_FUNCTION (this << " " << eid.Uri ());
+  std::map <BpEndpointId, BpEndpointId>::iterator it = m_altRouteMap.find (eid);
+  if (it == m_altRouteMap.end ())
+    {
+      return false;
+    }
+  else
+    {
+      return true;
     }
 }
 
