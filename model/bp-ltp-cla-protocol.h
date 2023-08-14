@@ -132,14 +132,30 @@ private:
     void CheckForBundleToSendFromTxQueue(LinkWaitingStatus waitStatus);
     int SendIfLinkUp (uint64_t destLtpEngineId);
     void CheckLinkStatus (void);
+    void SendBundleToNextHop (Ptr<BpBundle> bundle, BpEndpointId nextHopEid);
 
     // Callbacks
     void ConnectionRequestSucceededCallback (Ptr<Socket> socket);
     void ConnectionRequestFailedCallback (Ptr<Socket> socket);
+    void L4LinkToEidConnectionRequestSucceededCallback (Ptr<Socket> socket);
+    void L4LinkToEidConnectionRequestFailedCallback (Ptr<Socket> socket);
+
+    void UpdateL4LinkToEidSocketStatus (Ptr<Socket> socket, uint8_t socketStatus);
+    int CheckL4LinkToEid(BpEndpointId dst, Ptr<Socket> socket);
 
     void IncrementTxCnt (void);
     void DecrementTxCnt (void);
     uint32_t GetTxCnt (void);
+
+    struct TxLinkCheckVectorVals {
+        Ptr<Socket> primarySocket;
+        Ptr<Socket> alternateSocket;
+        BpEndpointId primaryDstEid;
+        BpEndpointId alternateDstEid;
+        uint8_t primaryRouteStatus; // 0 = waiting for status, 1 = link up, 2 = link down
+        uint8_t alternateRouteStatus; // 0 = waiting for status, 1 = link up, 2 = link down
+        Ptr<BpBundle> bundle;
+    };
 
     struct TxMapVals {
         ns3::ltp::SessionId sessionId;
@@ -182,6 +198,9 @@ private:
     uint32_t m_txCnt;                                            // Counter of all transmissions attempted in current time instance
     //std::queue<TxQueueVals> m_txQueue;                           // Queue of bundles to be transmitted
     std::map<uint64_t, std::deque<TxQueueVals> > m_txQueueMap;    // Map of Tx queues for each LTP engine ID
+
+    // Checking status of primary and alternate routes
+    std::vector<TxLinkCheckVectorVals> m_txLinkStatusVector;  // Map of Tx link check vectors for each destination
 
     // Verifying link availability prior to sending bundle to Ltp
     std::map<Ptr<Socket>, uint64_t> m_socketToLtpEngineId;        // Map of sockets to LTP engine IDs

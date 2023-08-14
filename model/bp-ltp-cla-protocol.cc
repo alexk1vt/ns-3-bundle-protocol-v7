@@ -80,76 +80,161 @@ BpLtpClaProtocol::SetBundleProtocol (Ptr<BundleProtocol> bundleProtocol)
     m_bp = bundleProtocol;
 }
 
+void
+BpLtpClaProtocol::SendBundleToNextHop (Ptr<BpBundle> bundle, BpEndpointId nextHopEid)
+{
+    NS_LOG_FUNCTION (this << bundle << nextHopEid.Uri () );
+
+    BpPrimaryBlock *bpPrimaryBlockPtr = bundle->GetPrimaryBlockPtr ();
+    BpEndpointId src = bpPrimaryBlockPtr->GetSourceEid ();
+
+    // Send the bundle
+    // Create mapping to keep track of bundle and its ongoing corresponding Ltp Session
+    // Mapping may need to wait until LtpSession is created
+    // Look up destination Engine Id based on destEID
+
+    BpEndpointId internalEid = m_bp->GetBpEndpointId ();
+    
+    uint64_t returnType;
+    uint64_t nextHopEngineId = GetL4Address (nextHopEid, returnType);
+    if (nextHopEngineId == -1)
+    {
+        NS_LOG_FUNCTION (this << " Unable to get L4 address for eid: " << nextHopEid.Uri ());
+        return;
+    }
+    
+    RedDataModes redDataMode = RED_DATA_SLIM; // Options are RED_DATA_NONE, RED_DATA_SLIM, RED_DATA_ROBUST, RED_DATA_ALL
+    //uint64_t redSize = 0;
+    
+    // store bundle pointer in Tx Session Map for later updating and tracking _prior_ to sending
+    TxMapVals txMapVals;
+    txMapVals.dstEid = nextHopEid;
+    txMapVals.srcEid = internalEid;
+    txMapVals.srcLtpEngineId = m_LtpEngineId;
+    txMapVals.dstLtpEngineId = nextHopEngineId;
+    txMapVals.set = false;
+    std::map<Ptr<BpBundle>, TxMapVals>::iterator it = m_txSessionMap.find (bundle);
+    if (it == m_txSessionMap.end ())
+    {
+        m_txSessionMap.insert (std::pair<Ptr<BpBundle>, TxMapVals>(bundle, txMapVals));
+        NS_LOG_FUNCTION (this << " Inserted bundle into txSessionMap with srcLtpEngineId: " << m_LtpEngineId);
+    }
+    else
+    {
+        NS_LOG_FUNCTION (this << " Unable to insert bundle into txSessionMap");
+        return;
+    }
+
+    NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Queuing bundle from eid: " << src.Uri () << " to nextHopEid: " << nextHopEid.Uri () << " with nextHopEngineId: " << nextHopEngineId << " to send.");
+    // if redDataMode == RED_DATA_SLIM or RED_DATA_ROBUST, need to split bundle into red/green parts
+    // if redDataMode == RED_DATA_NONE or RED_DATA_ALL, send entire bundle as either green or part
+    if (redDataMode == RED_DATA_NONE)
+    {
+        AddBundleToTxQueue (bundle->GetCborEncoding (), nextHopEngineId, 0);
+    }
+    else if (redDataMode == RED_DATA_ALL)
+    {
+        AddBundleToTxQueue (bundle->GetCborEncoding (), nextHopEngineId, bundle->GetCborEncodingSize ());
+    }
+    else
+    {
+        uint64_t redSize = 0;
+        std::vector<uint8_t> splitCborBundle = SplitBundle (bundle, redDataMode, &redSize);
+        AddBundleToTxQueue (splitCborBundle, nextHopEngineId, redSize);
+    }
+
+    return;
+}
+
 int
 BpLtpClaProtocol::SendBundle (Ptr<BpBundle> bundlePtr)
 {
     NS_LOG_FUNCTION (this << " " << bundlePtr);
-    
     BpPrimaryBlock *bpPrimaryBlockPtr = bundlePtr->GetPrimaryBlockPtr ();
     BpEndpointId src = bpPrimaryBlockPtr->GetSourceEid ();
-    BpEndpointId dst = bpPrimaryBlockPtr->GetDestinationEid ();
+    
     Ptr<BpBundle> bundle = m_bp->GetBundle (src); // this is retrieved again here in order to pop the packet from the SendBundleStore! -- TODO: FIX THIS!!
 
     if (bundle)
     {
-        // Send the bundle
-        // Create mapping to keep track of bundle and its ongoing corresponding Ltp Session
-        // Mapping may need to wait until LtpSession is created
-        // Look up destination Engine Id based on destEID
-
-        BpEndpointId internalEid = m_bp->GetBpEndpointId ();
-        
-        uint64_t ClientServiceId = 1; // 1 - bundle protocol
+        bpPrimaryBlockPtr = bundle->GetPrimaryBlockPtr ();
+        BpEndpointId dst = bpPrimaryBlockPtr->GetDestinationEid ();
         Ptr<BpStaticRoutingProtocol> route = DynamicCast<BpStaticRoutingProtocol> (m_bpRouting);
-        BpEndpointId nextHopEid = route->GetRoute (dst);
-        uint64_t returnType;
-        uint64_t nextHopEngineId = GetL4Address (nextHopEid, returnType);
-        if (nextHopEngineId == -1)
+        if (!route->HasAlternateRoute (dst))
         {
-            NS_LOG_FUNCTION (this << " Unable to get L4 address for eid: " << nextHopEid.Uri ());
-            return -1;
+            
+            NS_LOG_FUNCTION (this << " No alternate route exists for eid: " << dst.Uri ());
+            BpEndpointId nextHopEid = route->GetRoute (dst);
+            SendBundleToNextHop (bundle,  nextHopEid);
+            return 0;
         }
+
+        NS_LOG_FUNCTION (this << " Alternate route exists for eid: " << dst.Uri ());
+        BpEndpointId primaryNextHopEid = route->GetRoute (dst);
+        BpEndpointId alternateNextHopEid = route->GetAlternateRoute (dst);
         
-        RedDataModes redDataMode = RED_DATA_SLIM; // Options are RED_DATA_NONE, RED_DATA_SLIM, RED_DATA_ROBUST, RED_DATA_ALL
-        //uint64_t redSize = 0;
-        
-        // store bundle pointer in Tx Session Map for later updating and tracking _prior_ to sending
-        TxMapVals txMapVals;
-        txMapVals.dstEid = nextHopEid;
-        txMapVals.srcEid = internalEid;
-        txMapVals.srcLtpEngineId = m_LtpEngineId;
-        txMapVals.dstLtpEngineId = nextHopEngineId;
-        txMapVals.set = false;
-        std::map<Ptr<BpBundle>, TxMapVals>::iterator it = m_txSessionMap.find (bundle);
-        if (it == m_txSessionMap.end ())
+        // Build sockets to test the connection with
+        TypeId tid;
+        tid = TypeId::LookupByName ("ns3::UdpSocketFactory");
+
+        Ptr<Socket> alternateSocket = Socket::CreateSocket (m_bp->GetNode (), tid);
+        if (alternateSocket->Bind () == 0)
         {
-            m_txSessionMap.insert (std::pair<Ptr<BpBundle>, TxMapVals>(bundle, txMapVals));
-            NS_LOG_FUNCTION (this << " Inserted bundle into txSessionMap with srcLtpEngineId: " << m_LtpEngineId);
+            alternateSocket->SetConnectCallback(MakeCallback (&BpLtpClaProtocol::L4LinkToEidConnectionRequestSucceededCallback, this),
+                                                MakeCallback (&BpLtpClaProtocol::L4LinkToEidConnectionRequestFailedCallback, this));
         }
         else
         {
-            NS_LOG_FUNCTION (this << " Unable to insert bundle into txSessionMap");
+            NS_LOG_FUNCTION (this << " Unable to bind socket to alternate route; defaulting to primary route");
+            SendBundleToNextHop (bundle,  primaryNextHopEid);
+            return 0;
+        }
+
+        Ptr<Socket> primarySocket = Socket::CreateSocket (m_bp->GetNode (), tid);
+        if (primarySocket->Bind () != 0)
+        {
+            NS_LOG_FUNCTION (this << " Unable to bind socket to primary route");
             return -1;
         }
+        primarySocket->SetConnectCallback(MakeCallback (&BpLtpClaProtocol::L4LinkToEidConnectionRequestSucceededCallback, this),
+                                                MakeCallback (&BpLtpClaProtocol::L4LinkToEidConnectionRequestFailedCallback, this));
+        
+        // Build struct to insert into vector
+        TxLinkCheckVectorVals txLinkCheckVectorVals;
+        txLinkCheckVectorVals.bundle = bundle;
+        txLinkCheckVectorVals.primarySocket = primarySocket;
+        txLinkCheckVectorVals.primaryDstEid = primaryNextHopEid;
+        txLinkCheckVectorVals.primaryRouteStatus = 0;
+        txLinkCheckVectorVals.alternateSocket = alternateSocket;
+        txLinkCheckVectorVals.alternateDstEid = alternateNextHopEid;
+        txLinkCheckVectorVals.alternateRouteStatus = 0;
+        
+        m_txLinkStatusVector.push_back (txLinkCheckVectorVals);
 
-        NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Queuing bundle from eid: " << src.Uri () << " to nextHopEid: " << nextHopEid.Uri () << " with nextHopEngineId: " << nextHopEngineId << " to send.");
-        // if redDataMode == RED_DATA_SLIM or RED_DATA_ROBUST, need to split bundle into red/green parts
-        // if redDataMode == RED_DATA_NONE or RED_DATA_ALL, send entire bundle as either green or part
-        if (redDataMode == RED_DATA_NONE)
+        // Test altenate route first
+        if (CheckL4LinkToEid (alternateNextHopEid, alternateSocket) < 0)
         {
-            AddBundleToTxQueue (bundle->GetCborEncoding (), nextHopEngineId, 0);
+            // initial check to alternate route failed; manually performing failure callback
+            L4LinkToEidConnectionRequestFailedCallback (alternateSocket);
+            // initial check to alternate route failed; defaulting to primary
+            //alternateSocket->Close ();
+            //primarySocket->Close ();
+            //m_txLinkStatusVector.pop_back ();
+            //SendBundleToNextHop (bundle,  primaryNextHopEid);
+            //return 0;
         }
-        else if (redDataMode == RED_DATA_ALL)
+        // Test primary route
+        if (CheckL4LinkToEid (primaryNextHopEid, primarySocket) < 0)
         {
-            AddBundleToTxQueue (bundle->GetCborEncoding (), nextHopEngineId, bundle->GetCborEncodingSize ());
+            // initial check to alternate route failed; manually performing failure callback
+            L4LinkToEidConnectionRequestFailedCallback (primarySocket);
+            // initial check to primary route failed; using alternate
+            //alternateSocket->Close ();
+            //primarySocket->Close ();
+            //m_txLinkStatusVector.pop_back ();
+            //SendBundleToNextHop (bundle,  alternateNextHopEid);
+            //return 0;
         }
-        else
-        {
-            uint64_t redSize = 0;
-            std::vector<uint8_t> splitCborBundle = SplitBundle (bundle, redDataMode, &redSize);
-            AddBundleToTxQueue (splitCborBundle, nextHopEngineId, redSize);
-        }
-
         return 0;
     }
     NS_LOG_FUNCTION (this << " Unable to get bundle for eid: " << src.Uri ());
@@ -272,7 +357,6 @@ BpLtpClaProtocol::CheckLinkStatus (void)
         }
         it++;
     }
-
 }
 
 void
@@ -733,7 +817,8 @@ std::vector<uint8_t>
 BpLtpClaProtocol::SplitBundle (Ptr<BpBundle> bundle, RedDataModes redDataMode, uint64_t *redSize)
 {
     NS_LOG_FUNCTION (this << " redDataMode: " << redDataMode);
-    NS_LOG_FUNCTION (this << " Original bundle CBOR size is " << bundle->GetCborEncodingSize () << " bytes");
+    uint32_t cborSize = bundle->GetCborEncodingSize ();
+    NS_LOG_FUNCTION (this << " Original bundle CBOR size is " << cborSize << " bytes");
 
     Ptr<BpBundle> splitBundle = CreateObject<BpBundle> ();
     splitBundle->SetRetentionConstraint(bundle->GetRetentionConstraint ());
@@ -1055,5 +1140,130 @@ BpLtpClaProtocol::ConnectionRequestFailedCallback (Ptr<Socket> socket)
     }
 }
 
+int
+BpLtpClaProtocol::CheckL4LinkToEid(BpEndpointId nextHopEid, Ptr<Socket> socket)
+{
+    NS_LOG_FUNCTION (this << nextHopEid.Uri ());
+
+    uint64_t returnType;
+    uint64_t nextHopEngineId = GetL4Address (nextHopEid, returnType);
+    if (nextHopEngineId == -1)
+    {
+        NS_LOG_FUNCTION (this << " Unable to get L4 address for eid: " << nextHopEid.Uri ());
+        return -1;
+    }
+    InetSocketAddress nextHopAddr = m_ltp->GetBindingFromLtpEngineId (nextHopEngineId);
+    if (nextHopAddr == InetSocketAddress ("127.0.0.1", 0))
+    {
+        NS_LOG_FUNCTION (this << "Unable to find destination address for LtpEngineId: " << nextHopEngineId);
+        return -1;
+    }
+    Ptr<Ipv4> nodeIpv4 = m_bp->GetNode ()->GetObject<Ipv4> ();
+    Ptr<Ipv4RoutingProtocol> routingProtocol = nodeIpv4->GetRoutingProtocol ();
+    Ipv4Header ipv4Header;
+    ipv4Header.SetDestination(nextHopAddr.GetIpv4 ());
+    Socket::SocketErrno sockErr;
+    Ptr<Ipv4Route> route = routingProtocol->RouteOutput(NULL, ipv4Header, 0, sockErr);
+    if (sockErr != Socket::ERROR_NOTERROR || !route)
+    {
+        NS_LOG_FUNCTION (this << " No route to destination address: " << nextHopAddr.GetIpv4 ());
+        return -1;
+    }
+    uint32_t outputIfIndex = nodeIpv4->GetInterfaceForDevice (route->GetOutputDevice ());
+    Ptr<NetDevice> netDevice = nodeIpv4->GetNetDevice (outputIfIndex);
+    if (!nodeIpv4->IsUp (outputIfIndex) || !netDevice->IsLinkUp ())
+    {
+        NS_LOG_FUNCTION (this << " No interface or device available for interface index " << outputIfIndex);
+        return -1;
+    }
+
+    if (socket->Connect (nextHopAddr) != 0)
+    {
+        NS_LOG_FUNCTION (this << " Unable to initiate connection to destination address: " << nextHopAddr);
+        socket->Close();
+        return -1;
+    }
+    NS_LOG_FUNCTION (this << " Connection request pending for " << nextHopEid.Uri () << " with address: " << nextHopAddr.GetIpv4 () << "; waiting for callback");
+    return 0;
+
+}
+
+void
+BpLtpClaProtocol::L4LinkToEidConnectionRequestSucceededCallback (Ptr<Socket> socket)
+{
+    NS_LOG_FUNCTION (this << socket);
+
+    UpdateL4LinkToEidSocketStatus (socket, 1);
+}
+
+void
+BpLtpClaProtocol::L4LinkToEidConnectionRequestFailedCallback (Ptr<Socket> socket)
+{
+    NS_LOG_FUNCTION (this << socket);
+
+    UpdateL4LinkToEidSocketStatus (socket, 2);
+}
+
+void
+BpLtpClaProtocol::UpdateL4LinkToEidSocketStatus (Ptr<Socket> socket, uint8_t socketStatus)
+{
+    NS_LOG_FUNCTION (this << socket << socketStatus);
+
+    // Finished performing operations on socket, so close it
+    socket->Close ();
+
+    std::vector<TxLinkCheckVectorVals>::iterator it = m_txLinkStatusVector.begin ();
+    for (; it != m_txLinkStatusVector.end (); ++it)
+    {
+        if (it->primarySocket == socket || it->alternateSocket == socket)
+        {
+            break;
+        }
+    }
+    if (it == m_txLinkStatusVector.end ())
+    {
+        NS_LOG_FUNCTION (this << "Unable to find socket in m_txLinkStatusVector");
+        return;
+    }
+    if (it->primarySocket == socket)
+    {
+        it->primaryRouteStatus = socketStatus;
+    }
+    else
+    {
+        it->alternateRouteStatus = socketStatus;
+    }
+    if (it->primaryRouteStatus == 0 || it->alternateRouteStatus == 0)
+    {
+        NS_LOG_FUNCTION (this << "Waiting for other socket to respond");
+        return;
+    }
+    TxLinkCheckVectorVals txLinkCheckVectorVals = *it;
+    m_txLinkStatusVector.erase (it);
+
+    BpEndpointId nextHop;
+    if (txLinkCheckVectorVals.primaryRouteStatus == 1 && txLinkCheckVectorVals.alternateRouteStatus == 1)
+    {
+        NS_LOG_FUNCTION (this << "Both routes are up, using primary route");
+        nextHop = txLinkCheckVectorVals.primaryDstEid;
+    }
+    else if (txLinkCheckVectorVals.primaryRouteStatus == 1 && txLinkCheckVectorVals.alternateRouteStatus == 2)
+    {
+        NS_LOG_FUNCTION (this << "Alternate route failed, using primary route");
+        nextHop = txLinkCheckVectorVals.primaryDstEid;
+    }
+    else if (txLinkCheckVectorVals.primaryRouteStatus == 2 && txLinkCheckVectorVals.alternateRouteStatus == 1)
+    {
+        NS_LOG_FUNCTION (this << "Primary route failed, using alternate route");
+        nextHop = txLinkCheckVectorVals.alternateDstEid;
+    }
+    else
+    {
+        NS_LOG_FUNCTION (this << "Both routes failed, using primary route to wait");
+        nextHop = txLinkCheckVectorVals.primaryDstEid;
+    }
+    // Proceed to send bundle to next hop
+    SendBundleToNextHop (txLinkCheckVectorVals.bundle, nextHop);
+}
 
 } // namespace ns3
