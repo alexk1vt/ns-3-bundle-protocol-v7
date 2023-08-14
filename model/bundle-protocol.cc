@@ -707,20 +707,21 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
   std::map<BpEndpointId, std::queue<Ptr<BpBundle> > >::iterator itMap = BpRecvBundleStore.find (dst);
 
   if ( itMap == BpRecvBundleStore.end ())
-    {
-      // this is the first bundle received by this destination endpoint id
-      NS_LOG_FUNCTION (this << " First bundle received for dst: " << dst.Uri () << "; creating new queue");
-      std::queue<Ptr<BpBundle> > qu;
-      qu.push (bundle);
-      BpRecvBundleStore.insert (std::pair<BpEndpointId, std::queue<Ptr<BpBundle> > > (dst, qu) );
-    }
+  {
+    // this is the first bundle received by this destination endpoint id
+    NS_LOG_FUNCTION (this << " First bundle received for dst: " << dst.Uri () << "; creating new queue");
+    std::queue<Ptr<BpBundle> > qu;
+    qu.push (bundle);
+    BpRecvBundleStore.insert (std::pair<BpEndpointId, std::queue<Ptr<BpBundle> > > (dst, qu) );
+  }
   else
-    {
-      // ongoing bundles
-      NS_LOG_FUNCTION (this << " Have previously received bundle for dst: " << dst.Uri () << "; storing in existing queue");
-      (*itMap).second.push (bundle);
-    }
-
+  {
+    // ongoing bundles
+    NS_LOG_FUNCTION (this << " Have previously received bundle for dst: " << dst.Uri () << "; storing in existing queue");
+    (*itMap).second.push (bundle);
+  }
+  // Notify application that bundle has been received
+  NotifyBundleRecv (dst);
 }
 
 std::vector<uint8_t>
@@ -872,6 +873,23 @@ BundleProtocol::ProcessExtensionBlocks (Ptr<BpBundle> bundle, bool printOnly)
   }
 }
 
+void
+BundleProtocol::SetRecvCallback (Callback<void, BpEndpointId> receivedBundleCb)
+{
+  NS_LOG_FUNCTION (this << &receivedBundleCb);
+  m_receivedBundleCb = receivedBundleCb;
+}
+
+void
+BundleProtocol::NotifyBundleRecv (BpEndpointId eid)
+{
+  NS_LOG_FUNCTION (this << eid.Uri ());
+  if (!m_receivedBundleCb.IsNull ())
+  {
+    m_receivedBundleCb (eid);
+  }
+}
+
 void 
 BundleProtocol::SetBpRegisterInfo (struct BpRegisterInfo info)
 { 
@@ -933,6 +951,7 @@ BundleProtocol::DoDispose (void)
   m_node = 0;
   m_cla = 0;
   m_bpRoutingProtocol = 0;
+  m_receivedBundleCb = MakeNullCallback<void, BpEndpointId> ();
   m_startEvent.Cancel ();
   m_stopEvent.Cancel ();
   Object::DoDispose ();
