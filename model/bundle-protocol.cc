@@ -665,7 +665,7 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
       NS_LOG_FUNCTION (this << " Have " << CurrentBundleLength << " out of " << AduLength << ". Waiting to receive rest");
       return;
     }
-    // bundle is complete
+    // bundle is complete, begine assembly
     NS_LOG_FUNCTION (this << " Have complete bundle of size " << CurrentBundleLength << ". Reassembling");
     // Get first fragment and start building from there;
 
@@ -673,6 +673,7 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
     u_int32_t fragBpPayloadLength = 0;
     CurrentBundleLength = 0;
     std::string fragmentBuffer = "";
+    bool corruptedBundle = false;
 
     for (; CurrentBundleLength < AduLength; CurrFragOffset = CurrentBundleLength)
     {
@@ -680,17 +681,27 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
       if (itFrag == (*itBpFrag).second.end ())
       {
         NS_LOG_FUNCTION (this << " Could not find fragment with offset: " << CurrFragOffset);
-        return;
+        corruptedBundle = true;
+        break;
       }
       
       fragBpPayloadBlockPtr = itFrag->second->GetPayloadBlockPtr ();
+      if (fragBpPayloadBlockPtr == nullptr)
+      {
+        NS_LOG_FUNCTION (this << " Bundle fragment missing payload block. Inserting notification into ADU");
+        corruptedBundle = true;
+        break;
+      }
       fragBpPayloadLength = fragBpPayloadBlockPtr->GetBlockDataSize ();
       NS_LOG_FUNCTION (this << " Found fragment with offset: " << CurrFragOffset << " with size " << fragBpPayloadLength);
       std::string fragBpPayload = fragBpPayloadBlockPtr->GetBlockData ();
       fragmentBuffer += fragBpPayload;
       CurrentBundleLength += fragBpPayloadLength;
     }
-    
+    if (corruptedBundle)
+    {
+      fragmentBuffer = "Corrupted bundle: Missing fragments; no ADU available";
+    }
     // fragmentBuffer now contains the reconstructed ADU
     NS_LOG_FUNCTION ( this << " Reconstructed ADU: " << FragName << " with size " << fragmentBuffer.size ());
     BpCanonicalBlock* payloadBlockPtr = bundle->GetPayloadBlockPtr ();
@@ -813,6 +824,13 @@ BundleProtocol::GetNode () const
 { 
   NS_LOG_FUNCTION (this);
   return m_node;
+}
+
+Ptr<BpClaProtocol>
+BundleProtocol::GetCla ()
+{
+  NS_LOG_FUNCTION (this);
+  return m_cla;
 }
 
 Ptr<BpBundle> 

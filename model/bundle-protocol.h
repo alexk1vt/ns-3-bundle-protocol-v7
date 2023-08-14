@@ -345,7 +345,7 @@ public:
    *
    * \return routing protocol
    */
-  Ptr<BpRoutingProtocol> GetRoutingProtocol ();
+  Ptr<BpRoutingProtocol> GetRoutingProtocol (); 
 
   /**
    * Set the register information
@@ -353,6 +353,8 @@ public:
    * \param info register information
    */
   void SetBpRegisterInfo (struct BpRegisterInfo info);
+
+  Ptr<BpClaProtocol> GetCla (); 
 
   void SetRecvCallback (Callback<void, Ptr<BundleProtocol> > receivedBundleCb);
 

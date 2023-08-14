@@ -249,6 +249,30 @@ BpBundle::GetPayloadBlock () const
     return m_payloadBlock;
 }
 
+BpPrimaryBlock*
+BpBundle::GetPrimaryBlockPtr ()
+{
+    if (m_bundle.contains (BUNDLE_PRIMARY_BLOCK))
+    {
+        return &m_primaryBlock;
+    }
+    return nullptr;
+}
+
+BpCanonicalBlock*
+BpBundle::GetPayloadBlockPtr ()
+{
+    if (m_bundle.contains(BUNDLE_PAYLOAD_BLOCK))
+    {
+        return &m_payloadBlock;
+    }
+    return nullptr;
+    //BpCanonicalBlock payloadBlock;
+    //payloadBlock.SetCanonicalBlockFromJson(m_bundle[BUNDLE_PAYLOAD_BLOCK]);
+    //m_payloadBlock = payloadBlock;
+    //return &m_payloadBlock;
+}
+
 BpCanonicalBlock
 BpBundle::GetExtensionBlock (uint8_t blockType)
 {
