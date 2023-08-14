@@ -354,7 +354,7 @@ public:
    */
   void SetBpRegisterInfo (struct BpRegisterInfo info);
 
-  void SetRecvCallback (Callback<void, BpEndpointId> receivedBundleCb);
+  void SetRecvCallback (Callback<void, Ptr<BundleProtocol> > receivedBundleCb);
 
   /**
    * \brief Specify bundle protocol start time
@@ -394,7 +394,7 @@ private:
 
   void RetreiveCBORBundle ();
 
-  void NotifyBundleRecv (BpEndpointId eid);
+  void NotifyBundleRecv ();
 
   // Extension Block Support
   //void AddUpdateExtBundle (uint32_t blockType, Ptr<BpBundle> bundle);
@@ -448,7 +448,7 @@ private:
   BpRegisterInfo m_bpRegInfo;     /// register information
   Ptr<BpRoutingProtocol> m_bpRoutingProtocol; /// bundle routing protocol
 
-  Callback<void, BpEndpointId> m_receivedBundleCb; /// callback for received bundle
+  Callback<void, Ptr<BundleProtocol> > m_receivedBundleCb; /// callback for received bundle
 
   Time m_startTime;         /// The simulation time that the bundle protocol will start
   Time m_stopTime;          /// The simulation time that the bundle protocol will end

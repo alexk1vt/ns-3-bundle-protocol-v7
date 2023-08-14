@@ -72,6 +72,19 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
     }
 }
 
+void RecvCallback (Ptr<BundleProtocol> receiver)
+{
+  NS_LOG_FUNCTION ("RecvCallback called for " << receiver);
+  BpEndpointId eid = receiver->GetBpEndpointId ();
+  Receive_char_array (receiver, eid);
+}
+
+void SetRecvCallback (Ptr<BundleProtocol> receiver)
+{
+  Callback<void, Ptr<BundleProtocol> > cb = MakeCallback (&RecvCallback);
+  receiver->SetRecvCallback (cb);
+}
+
 void Register (Ptr<BundleProtocol> node, BpEndpointId eid, uint64_t l4Address)
 {
     std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
@@ -315,7 +328,8 @@ main (int argc, char *argv[])
   Simulator::Schedule (Seconds (0.3), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);  
 
   // receive function
-  Simulator::Schedule (Seconds (8), &Receive_char_array, bpReceivers.Get (0), eidRecv);
+  //Simulator::Schedule (Seconds (8), &Receive_char_array, bpReceivers.Get (0), eidRecv);
+  Simulator::Schedule (Seconds (0), &SetRecvCallback, bpReceivers.Get (0));
   if (tracing)
     {
       AsciiTraceHelper ascii;

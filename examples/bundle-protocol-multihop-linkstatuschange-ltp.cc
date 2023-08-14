@@ -71,6 +71,19 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
     }
 }
 
+void RecvCallback (Ptr<BundleProtocol> receiver)
+{
+  NS_LOG_FUNCTION ("RecvCallback called for " << receiver);
+  BpEndpointId eid = receiver->GetBpEndpointId ();
+  Receive_char_array (receiver, eid);
+}
+
+void SetRecvCallback (Ptr<BundleProtocol> receiver)
+{
+  Callback<void, Ptr<BundleProtocol> > cb = MakeCallback (&RecvCallback);
+  receiver->SetRecvCallback (cb);
+}
+
 void Register (Ptr<BundleProtocol> node, BpEndpointId eid, uint64_t l4Address)
 {
     std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
@@ -295,7 +308,8 @@ char data[] = "The Senate of the United States shall be composed of two Senators
   Simulator::Schedule (Seconds (1.5), &Receive_char_array, bpReceivers.Get (0), eidRecv);
 
   // receive function
-  Simulator::Schedule (Seconds (3), &Receive_char_array, bpReceivers.Get (0), eidRecv);
+  //Simulator::Schedule (Seconds (3), &Receive_char_array, bpReceivers.Get (0), eidRecv);
+  Simulator::Schedule (Seconds (0), &SetRecvCallback, bpReceivers.Get (0));
 
   if (tracing)
     {

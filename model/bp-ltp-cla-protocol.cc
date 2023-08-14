@@ -845,7 +845,7 @@ BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
 }
 
 void
-BpLtpClaProtocol::LinkStatusChangeCallback()//(bool linkIsUp)
+BpLtpClaProtocol::LinkStatusChangeCallback(void)//(bool linkIsUp)
 {
     //NS_LOG_FUNCTION (this << linkIsUp);
     NS_LOG_FUNCTION (this);

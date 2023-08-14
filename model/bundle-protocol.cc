@@ -721,7 +721,7 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
     (*itMap).second.push (bundle);
   }
   // Notify application that bundle has been received
-  NotifyBundleRecv (dst);
+  NotifyBundleRecv ();
 }
 
 std::vector<uint8_t>
@@ -874,19 +874,19 @@ BundleProtocol::ProcessExtensionBlocks (Ptr<BpBundle> bundle, bool printOnly)
 }
 
 void
-BundleProtocol::SetRecvCallback (Callback<void, BpEndpointId> receivedBundleCb)
+BundleProtocol::SetRecvCallback (Callback<void, Ptr<BundleProtocol> > receivedBundleCb)
 {
   NS_LOG_FUNCTION (this << &receivedBundleCb);
   m_receivedBundleCb = receivedBundleCb;
 }
 
 void
-BundleProtocol::NotifyBundleRecv (BpEndpointId eid)
+BundleProtocol::NotifyBundleRecv ()
 {
-  NS_LOG_FUNCTION (this << eid.Uri ());
+  NS_LOG_FUNCTION (this);
   if (!m_receivedBundleCb.IsNull ())
   {
-    m_receivedBundleCb (eid);
+    m_receivedBundleCb (this);
   }
 }
 
@@ -951,7 +951,7 @@ BundleProtocol::DoDispose (void)
   m_node = 0;
   m_cla = 0;
   m_bpRoutingProtocol = 0;
-  m_receivedBundleCb = MakeNullCallback<void, BpEndpointId> ();
+  m_receivedBundleCb = MakeNullCallback<void, Ptr<BundleProtocol> > ();
   m_startEvent.Cancel ();
   m_stopEvent.Cancel ();
   Object::DoDispose ();
