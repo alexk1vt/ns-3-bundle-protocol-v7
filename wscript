@@ -23,8 +23,7 @@ def build(bld):
         'model/bp-canonical-block.cc',
         'model/bp-primary-block.cc',
         'helper/bundle-protocol-helper.cc',
-        'helper/bundle-protocol-container.cc',
-        'model/bp-crc.c'
+        'helper/bundle-protocol-container.cc'
         ]
     #module.lib=['ltp-protocol']
     module_test = bld.create_ns3_module_test_library('bundle-protocol')
@@ -50,8 +49,7 @@ def build(bld):
         'model/bp-primary-block.h',
         'model/json.hpp',
         'helper/bundle-protocol-helper.h',
-        'helper/bundle-protocol-container.h',
-        'model/bp-crc.h'
+        'helper/bundle-protocol-container.h'
         ]
 
     if bld.env.ENABLE_EXAMPLES:
