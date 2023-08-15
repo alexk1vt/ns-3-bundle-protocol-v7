@@ -88,7 +88,7 @@ BpCanonicalBlock::BpCanonicalBlock (uint8_t code, uint8_t number, uint64_t flags
     NS_LOG_FUNCTION (this);
     // copy the payload data into the block data
     std::string tempData = "";
-    for (int i = 0; i < payloadSize; i++)
+    for (decltype(payloadSize) i = 0; i < payloadSize; i++)
     {
         tempData += reinterpret_cast<const unsigned char> (payloadData[i]);
     }
@@ -111,7 +111,7 @@ BpCanonicalBlock::BpCanonicalBlock(uint8_t blockTypeCode, uint32_t payloadSize, 
     NS_LOG_FUNCTION (this);
     // copy the payload data into the block data
     std::string tempData = "";
-    for (int i = 0; i < payloadSize; i++)
+    for (decltype(payloadSize) i = 0; i < payloadSize; i++)
     {
         tempData += reinterpret_cast<const unsigned char> (payloadData[i]);
     }
@@ -293,11 +293,11 @@ BpCanonicalBlock::DumpAllButPayload () const
     uint8_t crcType = GetCrcType ();
     if (crcType == 1)
     {
-        uint16_t crc16Value = GetCrc16Value ();
+        crc16Value = GetCrc16Value ();
     }
     else if (crcType == 2)
     {
-        uint32_t crc32Value = GetCrc32Value ();
+        crc32Value = GetCrc32Value ();
     }
     NS_LOG_FUNCTION ("  Block Type Code: " << blockTypeCode);
     NS_LOG_FUNCTION ("  Block Number: " << blockNumber);
