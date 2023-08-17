@@ -54,7 +54,8 @@ BpLtpClaProtocol::BpLtpClaProtocol ()
     : m_bp (0),
       m_bpRouting (0),
       m_txCnt (0),
-      m_linkStatusCheckDelay (1)
+      m_linkStatusCheckDelay (1),
+      m_redDataMode (RED_DATA_SLIM)
 {
     NS_LOG_FUNCTION (this);
 }
@@ -103,7 +104,7 @@ BpLtpClaProtocol::SendBundleToNextHop (Ptr<BpBundle> bundle, BpEndpointId nextHo
         return;
     }
     
-    RedDataModes redDataMode = RED_DATA_SLIM; // Options are RED_DATA_NONE, RED_DATA_SLIM, RED_DATA_ROBUST, RED_DATA_ALL
+    //RedDataModes redDataMode = RED_DATA_SLIM; // Options are RED_DATA_NONE, RED_DATA_SLIM, RED_DATA_ROBUST, RED_DATA_ALL
     //uint64_t redSize = 0;
     
     // store bundle pointer in Tx Session Map for later updating and tracking _prior_ to sending
@@ -128,18 +129,18 @@ BpLtpClaProtocol::SendBundleToNextHop (Ptr<BpBundle> bundle, BpEndpointId nextHo
     NS_LOG_FUNCTION (this << " Internal engine id: " << m_LtpEngineId << " Queuing bundle from eid: " << src.Uri () << " to nextHopEid: " << nextHopEid.Uri () << " with nextHopEngineId: " << nextHopEngineId << " to send.");
     // if redDataMode == RED_DATA_SLIM or RED_DATA_ROBUST, need to split bundle into red/green parts
     // if redDataMode == RED_DATA_NONE or RED_DATA_ALL, send entire bundle as either green or part
-    if (redDataMode == RED_DATA_NONE)
+    if (m_redDataMode == RED_DATA_NONE)
     {
         AddBundleToTxQueue (bundle->GetCborEncoding (), nextHopEngineId, 0);
     }
-    else if (redDataMode == RED_DATA_ALL)
+    else if (m_redDataMode == RED_DATA_ALL)
     {
         AddBundleToTxQueue (bundle->GetCborEncoding (), nextHopEngineId, bundle->GetCborEncodingSize ());
     }
     else
     {
         uint64_t redSize = 0;
-        std::vector<uint8_t> splitCborBundle = SplitBundle (bundle, redDataMode, &redSize);
+        std::vector<uint8_t> splitCborBundle = SplitBundle (bundle, m_redDataMode, &redSize);
         AddBundleToTxQueue (splitCborBundle, nextHopEngineId, redSize);
     }
 
@@ -239,6 +240,13 @@ BpLtpClaProtocol::SendBundle (Ptr<BpBundle> bundlePtr)
     }
     NS_LOG_FUNCTION (this << " Unable to get bundle for eid: " << src.Uri ());
     return -1;
+}
+
+void
+BpLtpClaProtocol::SetRedDataMode (int redDataMode)
+{
+    NS_LOG_FUNCTION (this << redDataMode);
+    m_redDataMode = static_cast<RedDataModes>(redDataMode);
 }
 
 void
@@ -930,7 +938,7 @@ BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
 }
 
 void
-BpLtpClaProtocol::LinkStatusChangeCallback()//(bool linkIsUp)
+BpLtpClaProtocol::LinkStatusChangeCallback(void)//(bool linkIsUp)
 {
     //NS_LOG_FUNCTION (this << linkIsUp);
     NS_LOG_FUNCTION (this);

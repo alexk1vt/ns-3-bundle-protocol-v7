@@ -665,7 +665,7 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
       NS_LOG_FUNCTION (this << " Have " << CurrentBundleLength << " out of " << AduLength << ". Waiting to receive rest");
       return;
     }
-    // bundle is complete
+    // bundle is complete, begine assembly
     NS_LOG_FUNCTION (this << " Have complete bundle of size " << CurrentBundleLength << ". Reassembling");
     // Get first fragment and start building from there;
 
@@ -673,6 +673,7 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
     u_int32_t fragBpPayloadLength = 0;
     CurrentBundleLength = 0;
     std::string fragmentBuffer = "";
+    bool corruptedBundle = false;
 
     for (; CurrentBundleLength < AduLength; CurrFragOffset = CurrentBundleLength)
     {
@@ -680,17 +681,27 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
       if (itFrag == (*itBpFrag).second.end ())
       {
         NS_LOG_FUNCTION (this << " Could not find fragment with offset: " << CurrFragOffset);
-        return;
+        corruptedBundle = true;
+        break;
       }
       
       fragBpPayloadBlockPtr = itFrag->second->GetPayloadBlockPtr ();
+      if (fragBpPayloadBlockPtr == nullptr)
+      {
+        NS_LOG_FUNCTION (this << " Bundle fragment missing payload block. Inserting notification into ADU");
+        corruptedBundle = true;
+        break;
+      }
       fragBpPayloadLength = fragBpPayloadBlockPtr->GetBlockDataSize ();
       NS_LOG_FUNCTION (this << " Found fragment with offset: " << CurrFragOffset << " with size " << fragBpPayloadLength);
       std::string fragBpPayload = fragBpPayloadBlockPtr->GetBlockData ();
       fragmentBuffer += fragBpPayload;
       CurrentBundleLength += fragBpPayloadLength;
     }
-    
+    if (corruptedBundle)
+    {
+      fragmentBuffer = "Corrupted bundle: Missing fragments; no ADU available";
+    }
     // fragmentBuffer now contains the reconstructed ADU
     NS_LOG_FUNCTION ( this << " Reconstructed ADU: " << FragName << " with size " << fragmentBuffer.size ());
     BpCanonicalBlock* payloadBlockPtr = bundle->GetPayloadBlockPtr ();
@@ -707,20 +718,21 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
   std::map<BpEndpointId, std::queue<Ptr<BpBundle> > >::iterator itMap = BpRecvBundleStore.find (dst);
 
   if ( itMap == BpRecvBundleStore.end ())
-    {
-      // this is the first bundle received by this destination endpoint id
-      NS_LOG_FUNCTION (this << " First bundle received for dst: " << dst.Uri () << "; creating new queue");
-      std::queue<Ptr<BpBundle> > qu;
-      qu.push (bundle);
-      BpRecvBundleStore.insert (std::pair<BpEndpointId, std::queue<Ptr<BpBundle> > > (dst, qu) );
-    }
+  {
+    // this is the first bundle received by this destination endpoint id
+    NS_LOG_FUNCTION (this << " First bundle received for dst: " << dst.Uri () << "; creating new queue");
+    std::queue<Ptr<BpBundle> > qu;
+    qu.push (bundle);
+    BpRecvBundleStore.insert (std::pair<BpEndpointId, std::queue<Ptr<BpBundle> > > (dst, qu) );
+  }
   else
-    {
-      // ongoing bundles
-      NS_LOG_FUNCTION (this << " Have previously received bundle for dst: " << dst.Uri () << "; storing in existing queue");
-      (*itMap).second.push (bundle);
-    }
-
+  {
+    // ongoing bundles
+    NS_LOG_FUNCTION (this << " Have previously received bundle for dst: " << dst.Uri () << "; storing in existing queue");
+    (*itMap).second.push (bundle);
+  }
+  // Notify application that bundle has been received
+  NotifyBundleRecv ();
 }
 
 std::vector<uint8_t>
@@ -814,6 +826,13 @@ BundleProtocol::GetNode () const
   return m_node;
 }
 
+Ptr<BpClaProtocol>
+BundleProtocol::GetCla ()
+{
+  NS_LOG_FUNCTION (this);
+  return m_cla;
+}
+
 Ptr<BpBundle> 
 BundleProtocol::GetBundle (const BpEndpointId &src)
 { 
@@ -869,6 +888,23 @@ BundleProtocol::ProcessExtensionBlocks (Ptr<BpBundle> bundle, bool printOnly)
     bundle->AddUpdateBundleAgeExtBlock ();
     bundle->AddUpdateHopCountExtBlock ();
     // TODO:  Implement method to delete bundle if extension block thresholds have been reached
+  }
+}
+
+void
+BundleProtocol::SetRecvCallback (Callback<void, Ptr<BundleProtocol> > receivedBundleCb)
+{
+  NS_LOG_FUNCTION (this << &receivedBundleCb);
+  m_receivedBundleCb = receivedBundleCb;
+}
+
+void
+BundleProtocol::NotifyBundleRecv ()
+{
+  NS_LOG_FUNCTION (this);
+  if (!m_receivedBundleCb.IsNull ())
+  {
+    m_receivedBundleCb (this);
   }
 }
 
@@ -933,6 +969,7 @@ BundleProtocol::DoDispose (void)
   m_node = 0;
   m_cla = 0;
   m_bpRoutingProtocol = 0;
+  m_receivedBundleCb = MakeNullCallback<void, Ptr<BundleProtocol> > ();
   m_startEvent.Cancel ();
   m_stopEvent.Cancel ();
   Object::DoDispose ();

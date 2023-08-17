@@ -89,6 +89,7 @@ public:
 
     void SetLinkStatusCheckDelay (uint32_t delay);
 
+    void SetRedDataMode (int redDataMode);
 
   /*
   * Red Data modes
@@ -206,6 +207,8 @@ private:
     std::map<Ptr<Socket>, uint64_t> m_socketToLtpEngineId;        // Map of sockets to LTP engine IDs
 
     uint32_t m_linkStatusCheckDelay;                              // Time delay before rechecking link for status
+
+    RedDataModes m_redDataMode;                                   // Red data mode
 };
 
 } // namespace ns3

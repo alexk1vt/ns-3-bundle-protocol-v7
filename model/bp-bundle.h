@@ -196,24 +196,14 @@ public:
      * 
      * \return a pointer to the bundle primary block
      */
-    BpPrimaryBlock *GetPrimaryBlockPtr ()
-    {
-        return &m_primaryBlock;
-    }
+    BpPrimaryBlock *GetPrimaryBlockPtr ();
 
     /**
      * \brief Get a pointer to the payload block
      * 
      * \return a pointer to the payload block
      */
-    BpCanonicalBlock *GetPayloadBlockPtr ()
-    {
-        return &m_payloadBlock;
-        //BpCanonicalBlock payloadBlock;
-        //payloadBlock.SetCanonicalBlockFromJson(m_bundle[BUNDLE_PAYLOAD_BLOCK]);
-        //m_payloadBlock = payloadBlock;
-        //return &m_payloadBlock;
-    }
+    BpCanonicalBlock *GetPayloadBlockPtr ();
 
     json GetJson ()
     {
