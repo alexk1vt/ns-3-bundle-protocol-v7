@@ -532,7 +532,7 @@ BundleProtocol::ReceivePacket (Ptr<Packet> packet)
 
   uint32_t packetSize = m_bpRxBufferPacket->GetSize ();
   NS_LOG_FUNCTION (this << " Received packet of size: " << packetSize);
-  int size_check = 180;
+  uint32_t size_check = 180;
   if (packetSize > size_check)
   {  
     BpBundleHeader bundleHeader;

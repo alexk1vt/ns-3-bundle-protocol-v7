@@ -96,9 +96,9 @@ BpLtpClaProtocol::SendBundleToNextHop (Ptr<BpBundle> bundle, BpEndpointId nextHo
 
     BpEndpointId internalEid = m_bp->GetBpEndpointId ();
     
-    uint64_t returnType;
+    uint64_t returnType {(uint64_t) -1};
     uint64_t nextHopEngineId = GetL4Address (nextHopEid, returnType);
-    if (nextHopEngineId == -1)
+    if (nextHopEngineId == (uint64_t) -1)
     {
         NS_LOG_FUNCTION (this << " Unable to get L4 address for eid: " << nextHopEid.Uri ());
         return;
@@ -279,7 +279,7 @@ BpLtpClaProtocol::StartTransmission (Ptr<BpBundle> bundle, BpEndpointId nextHopE
 {
     NS_LOG_FUNCTION (this << " bundle: " << bundle << " nextHopEid: " << nextHopEid.Uri () << " nextHopEngineId: " << nextHopEngineId << " redSize: " << redSize);
     BpEndpointId internalEid = m_bp->GetBpEndpointId ();
-    uint32_t cborSize = bundle->GetCborEncodingSize ();
+    // uint32_t cborSize = bundle->GetCborEncodingSize ();
     std::vector <uint8_t> cborEncoding = bundle->GetCborEncoding ();
     //uint8_t* heapBuffer = new uint8_t[cborSize];
     //std::copy(cborEncoding.begin(), cborEncoding.end(), heapBuffer);
