@@ -54,7 +54,8 @@ BpLtpClaProtocol::BpLtpClaProtocol ()
     : m_bp (0),
       m_bpRouting (0),
       m_txCnt (0),
-      m_linkStatusCheckDelay (1)
+      m_linkStatusCheckDelay (1),
+      m_redDataMode (RED_DATA_SLIM)
 {
     NS_LOG_FUNCTION (this);
 }
