@@ -60,11 +60,66 @@ void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, 
   sender->Send_data (reinterpret_cast<const uint8_t*>(data), size, src, dst);
 }
 
+void Send_file (Ptr<BundleProtocol> sender, char* filename, BpEndpointId src, BpEndpointId dst)
+{
+  std::cout << Simulator::Now ().GetMilliSeconds () << " Send_file (..) called." << std::endl;
+  std::ifstream file (filename, std::ios::in|std::ios::binary|std::ios::ate);
+  if (file.is_open())
+    {
+      std::streampos size = file.tellg();
+      char* buffer = new char[size];
+      file.seekg (0, std::ios::beg);
+      file.read (buffer, size);
+      file.close();
+
+      std::cout << Simulator::Now ().GetMilliSeconds () << " Send a PDU with size " << size << ", containing:" << std::endl << buffer << std::endl;
+
+      sender->Send_data (reinterpret_cast<const uint8_t*>(buffer), size, src, dst);
+      delete [] buffer;
+    }
+  else
+    {
+      std::cout << "Unable to open file" << std::endl;
+    }
+}
+
+void Receive_file (Ptr<BundleProtocol> receiver, BpEndpointId eid)
+{
+  std::cout << Simulator::Now ().GetMilliSeconds () << " Receive_file (..) called." << std::endl;
+  std::vector<uint8_t> data = receiver->Receive_data (eid);
+  NS_LOG_INFO ("Receive(..) called.");
+  uint16_t i = 0;
+  while (!data.empty())
+    {
+      uint32_t size = data.size();
+      std::cout << Simulator::Now ().GetMilliSeconds () << " Receive bundle size " << size << std::endl;
+      char* buffer = new char[size];
+      std::copy(data.begin(), data.end(), buffer);
+
+      std::string filename = "received_file_" + std::to_string(i);
+      std::ofstream file (filename, std::ios::out|std::ios::binary|std::ios::ate);
+      if (file.is_open())
+        {
+          file.write (buffer, size);
+          file.close();
+        }
+      else
+        {
+          std::cout << "Unable to open file" << std::endl;
+        }
+
+      delete [] buffer;
+      // Try to get another packet
+      i++;
+      data = receiver->Receive_data (eid);
+    }
+}
+
 void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
 {
 
   std::vector<uint8_t> data = receiver->Receive_data (eid);
-  NS_LOG_INFO ("Receive(..) called.");
+  NS_LOG_INFO ("Receive_char_array(..) called.");
   while (!data.empty())
     {
       uint32_t size = data.size();
@@ -80,7 +135,14 @@ void Receive_char_array (Ptr<BundleProtocol> receiver, BpEndpointId eid)
     }
 }
 
-void RecvCallback (Ptr<BundleProtocol> receiver)
+void Recv_file_Callback (Ptr<BundleProtocol> receiver)
+{
+  NS_LOG_FUNCTION ("RecvCallback called for " << receiver);
+  BpEndpointId eid = receiver->GetBpEndpointId ();
+  Receive_file (receiver, eid);
+}
+
+void Recv_char_array_Callback (Ptr<BundleProtocol> receiver)
 {
   NS_LOG_FUNCTION ("RecvCallback called for " << receiver);
   BpEndpointId eid = receiver->GetBpEndpointId ();
@@ -89,7 +151,8 @@ void RecvCallback (Ptr<BundleProtocol> receiver)
 
 void SetRecvCallback (Ptr<BundleProtocol> receiver)
 {
-  Callback<void, Ptr<BundleProtocol> > cb = MakeCallback (&RecvCallback);
+  //Callback<void, Ptr<BundleProtocol> > cb = MakeCallback (&RecvCallback);
+  Callback<void, Ptr<BundleProtocol> > cb = MakeCallback (&Recv_file_Callback);
   receiver->SetRecvCallback (cb);
 }
 
@@ -244,7 +307,8 @@ main (int argc, char *argv[])
   
 
   NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);
-  Simulator::Schedule (Seconds (0.2), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);  
+  char filename[] = "Leo_Sensor.dat";
+  Simulator::Schedule (Seconds (0.2), &Send_file, bpSenders.Get (0), filename, eidSender, eidRecv);  
 
   // receive function
   //Simulator::Schedule (Seconds (0.8), &Receive_char_array, bpReceivers.Get (0), eidRecv);
@@ -258,7 +322,7 @@ main (int argc, char *argv[])
     }
 
   NS_LOG_INFO ("Run Simulation.");
-  Simulator::Stop (Seconds (1.0));
+  Simulator::Stop (Seconds (2.0));
   Simulator::Run ();
   Simulator::Destroy ();
   NS_LOG_INFO ("Done.");
