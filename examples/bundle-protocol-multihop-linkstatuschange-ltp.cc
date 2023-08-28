@@ -306,7 +306,7 @@ char data[] = "The Senate of the United States shall be composed of two Senators
                 " to Indictment, Trial, Judgment and Punishment, according to Law.";
 
   // setting LTP red mode
-  Simulator::Schedule (Seconds (0.1), &SetRedMode, bpSenders.Get (0), 3); // 0 = no red data; 1 = slim red data; 2 = robust red data, 3 = all red data
+  Simulator::Schedule (Seconds (0.1), &SetRedMode, bpSenders.Get (0), 1); // 0 = no red data; 1 = slim red data; 2 = robust red data, 3 = all red data
 
   // sending data bundle
   NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);

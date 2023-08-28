@@ -674,23 +674,10 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
             {
                 // Assemble the bundle and send up to bundle protocol
                 std::vector <uint8_t> assembledData (RcvIt->second.redData);
-                /*
-                std::vector <uint8_t> assembledData;
-                if (RcvIt->second.rcvRedDataLength > 0)
-                {
-                    NS_LOG_FUNCTION (this << "Red Data Received for SessionId " << id.GetSessionNumber () << " with length " << RcvIt->second.redData.size() << " bytes (declared size of " << RcvIt->second.rcvRedDataLength << " bytes)");
-                    // Assemble the bundle and send up to bundle protocol
-                    for ( std::vector<uint8_t>::const_iterator i = RcvIt->second.redData.begin(); i != RcvIt->second.redData.end(); ++i)
-                    {
-                        assembledData.push_back(*i);
-                    }
-                }
-                */
                 if (RcvIt->second.rcvGreenDataLength > 0)
                 {
                     NS_LOG_FUNCTION (this << "Green Data Received for SessionId " << id.GetSessionNumber () << " with length " << RcvIt->second.greenData.size() << " bytes (declared size of " << RcvIt->second.rcvGreenDataLength << " bytes)");
                     // Assemble the bundle and send up to bundle protocol
-                    //std::vector <uint8_t> assembledData;
                     for ( std::vector<uint8_t>::const_iterator i = RcvIt->second.greenData.begin(); i != RcvIt->second.greenData.end(); ++i)
                     {
                         assembledData.push_back(*i);
@@ -706,7 +693,10 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
                     NS_LOG_FUNCTION (this << " Receiver with engineID " << m_LtpEngineId << " passing bundle with CBOR size of " << assembledData.size() << " bytes to bundle protocol");
                     //m_bp->ReceiveCborVector (assembledData);
                     Ptr<BpBundle> assembledBundle = AssembleBundle (assembledData, RcvIt->second.rcvRedDataLength);
-                    m_bp->ReceiveBundle (assembledBundle);
+                    if (!assembledBundle->empty())
+                    {
+                        m_bp->ReceiveBundle (assembledBundle);
+                    }
                     m_rcvSessionMap.erase(RcvIt);
                 }
             }
@@ -814,6 +804,12 @@ BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
         if ( greenBundle->SetBundleFromCbor (greenData) < 0 )
         {
             NS_LOG_FUNCTION (this << " Error processing green bundle.  Dropping green portion and returning red bundle");
+            std::string redBlockDump = redBundle->GetJson ().dump ();
+            BpPrimaryBlock tempPrimaryBlock = BpPrimaryBlock ();
+            BpCanonicalBlock tempPayloadBlock = BpCanonicalBlock (BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, 1, 0, 0, redBlockDump.size (), reinterpret_cast<const uint8_t*>(redBlockDump.c_str ()));
+            Ptr<BpBundle> tempBundle = CreateObject<BpBundle> (0, tempPrimaryBlock, tempPayloadBlock);
+            redBundle->AddBlocksFromBundle (tempBundle, BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, false);
+
             return redBundle;
         }
         // Have both red and green portions - combine them into a single bundle
@@ -821,6 +817,12 @@ BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
         if (redBundle->AddBlocksFromBundle(greenBundle) < 0)
         {
             NS_LOG_FUNCTION (this << " Error adding green portion to red bundle. Dropping green portion and returning red bundle");
+            std::string redBlockDump = redBundle->GetJson ().dump ();
+            BpPrimaryBlock tempPrimaryBlock = BpPrimaryBlock ();
+            BpCanonicalBlock tempPayloadBlock = BpCanonicalBlock (BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, 1, 0, 0, redBlockDump.size (), reinterpret_cast<const uint8_t*>(redBlockDump.c_str ()));
+            Ptr<BpBundle> tempBundle = CreateObject<BpBundle> (0, tempPrimaryBlock, tempPayloadBlock);
+            redBundle->AddBlocksFromBundle (tempBundle, BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, false);
+
             return redBundle;
         }
 
