@@ -137,7 +137,7 @@ public:
     /**
      * \brief Rebuild bundle with currently configured values
     */
-    //void RebuildBundle ();
+    void RebuildBundle ();
 
     /**
      * \brief Deserialize from CBOR encoding

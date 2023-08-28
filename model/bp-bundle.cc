@@ -903,6 +903,15 @@ BpBundle::GetNewBlockNumber ()
 }
 
 void
+BpBundle::RebuildBundle ()
+{
+    NS_LOG_FUNCTION (this);
+    m_bundle[BUNDLE_PRIMARY_BLOCK] = m_primaryBlock.GetJson();
+    m_bundle[BUNDLE_PAYLOAD_BLOCK] = m_payloadBlock.GetJson();
+}
+
+
+void
 BpBundle::PrintCborBytes ()
 {
     NS_LOG_FUNCTION (this);
