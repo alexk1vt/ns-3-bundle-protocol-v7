@@ -45,6 +45,7 @@
 #include "ns3/ltp-protocol-helper.h"
 #include "ns3/ltp-protocol.h"
 //#include "ns3/ltp-header.h"
+#include "ns3/bp-ltp-cla-protocol.h"
 
 using namespace ns3;
 //using namespace ltp;
@@ -160,6 +161,12 @@ void Register (Ptr<BundleProtocol> node, BpEndpointId eid, uint64_t l4Address)
 {
     std::cout << Simulator::Now ().GetMilliSeconds () << " Registering external node " << eid.Uri () << std::endl;
     node->ExternalRegisterLtp (eid, 0, true, l4Address);
+}
+
+void SetRedMode (Ptr<BundleProtocol> bpNode, uint8_t redMode)
+{
+  std::cout << Simulator::Now ().GetMilliSeconds () << " Setting Node " << bpNode->GetBpEndpointId ().Uri () << " red mode to " << (uint32_t) redMode << std::endl;
+  DynamicCast<ns3::BpLtpClaProtocol> (bpNode->GetCla ())->SetRedDataMode (redMode);
 }
 
 int
@@ -306,12 +313,14 @@ main (int argc, char *argv[])
                 " to Indictment, Trial, Judgment and Punishment, according to Law.";
   
 
+  Simulator::Schedule (Seconds (0.1), &SetRedMode, bpSenders.Get (0), 2); // RED_DATA_ALL = 3; RED_DATA_NONE = 0; RED_DATA_SLIM = 1; RED_DATA_REPORT_ROBUST = 2;
+
   NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);
   char filename[] = "Leo_Sensor.dat";
   Simulator::Schedule (Seconds (0.2), &Send_file, bpSenders.Get (0), filename, eidSender, eidRecv);  
 
   // receive function
-  //Simulator::Schedule (Seconds (0.8), &Receive_char_array, bpReceivers.Get (0), eidRecv);
+  Simulator::Schedule (Seconds (0.8), &Receive_char_array, bpReceivers.Get (0), eidRecv);
   Simulator::Schedule (Seconds (0), &SetRecvCallback, bpReceivers.Get (0));
 
   if (false)

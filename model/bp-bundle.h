@@ -137,7 +137,7 @@ public:
     /**
      * \brief Rebuild bundle with currently configured values
     */
-    //void RebuildBundle ();
+    void RebuildBundle ();
 
     /**
      * \brief Deserialize from CBOR encoding
@@ -151,8 +151,6 @@ public:
     int AddBlocksFromBundle(Ptr<BpBundle> donatingBundle, BpCanonicalBlock::CanonicalBlockTypeCodes blockType, bool headlessBundle);
     int AddBlocksFromBundleExcept(Ptr<BpBundle> donatingBundle, BpCanonicalBlock::CanonicalBlockTypeCodes blockType, bool headlessBundle);
     int SetBundleFromJson (json donatingJson);
-
-    int AddCRCToBundle(uint8_t crcType);    
 
   // Getters
 

@@ -65,7 +65,6 @@ BpPrimaryBlock::BpPrimaryBlock ()
 }
 
 BpPrimaryBlock::BpPrimaryBlock(BpEndpointId src, BpEndpointId dst, uint32_t payloadSize)
-
 {
     NS_LOG_FUNCTION (this);
     m_sourceEndpointId = src;
@@ -600,6 +599,7 @@ bool
 BpPrimaryBlock::CheckCrcValue () // false for mismatch/calculation error; true for crc match
 {
     NS_LOG_FUNCTION (this);
+
     if (!m_primary_bundle_block.contains (PRIMARY_BLOCK_FIELD_CRC_VALUE))
     {
         NS_LOG_FUNCTION (this << " CRC value field not present in primary block");
@@ -631,6 +631,12 @@ BpPrimaryBlock::CheckCrcValue () // false for mismatch/calculation error; true f
         NS_LOG_FUNCTION (this << " CRC type not supported");
         return false;
     }
+}
+
+void
+BpPrimaryBlock::dump () const
+{
+    NS_LOG_FUNCTION (this << " " << m_primary_bundle_block.dump ());
 }
     
 } // namespace ns3

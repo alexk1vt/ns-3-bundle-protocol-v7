@@ -791,7 +791,7 @@ BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
 {
     NS_LOG_FUNCTION (this << " data.size() = " << data.size() << "; redSize = " << redSize);
     Ptr<BpBundle> bundle = CreateObject<BpBundle> ();
-    if (redSize > 0 && redSize < data.size ())
+    if (redSize > 0 && redSize < data.size ()) // data has green component that needs to be re-assembled with red component
     {
         // redSize is the amount of the vector, in bytes, that is red data
         // Since the vector is of type uint8_t, each element is 1 byte, making redSize usable as an index for the vector
@@ -807,7 +807,7 @@ BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
         if ( redBundle->SetBundleFromCbor (redData) < 0 )
         {
             NS_LOG_FUNCTION (this << " Error processing red bundle.  Dropping data and returning empty bundle");
-            return CreateObject<BpBundle> ();
+            return bundle;
         }
 
         Ptr<BpBundle> greenBundle = CreateObject<BpBundle> ();
@@ -840,14 +840,16 @@ BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
         bundle->SetBundleFromJson (redBundle->GetJson ());
         NS_LOG_FUNCTION (this << " Bundle assembled from both red and green parts; bundle payload has size: " << bundle->GetPayloadBlockPtr ()->GetBlockDataSize () << " bytes");
     }
-    else
+    else // either all green data or all red data, no re-assembly required
     {
-        int retVal = bundle->SetBundleFromCbor (data);
+        Ptr<BpBundle> tempBundle = CreateObject<BpBundle> ();
+        int retVal = tempBundle->SetBundleFromCbor (data);
         if (retVal < 0)
         {
             NS_LOG_FUNCTION (this << " Error processing bundle.  Dropping data and returning empty bundle");
-            return CreateObject<BpBundle> ();
+            return bundle;
         }
+        bundle->SetBundleFromJson (tempBundle->GetJson ());
     }
     return bundle;
 }

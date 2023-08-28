@@ -35,6 +35,7 @@
 #include "ns3/bp-static-routing-protocol.h"
 #include "ns3/bundle-protocol-helper.h"
 #include "ns3/bundle-protocol-container.h"
+#include "ns3/bp-ltp-cla-protocol.h"
 
 #include "ns3/ltp-protocol-helper.h"
 #include "ns3/ltp-protocol.h"
@@ -98,6 +99,12 @@ void print_Ipv4InterfaceAddress (Ptr<Ipv4Interface> iface_node)
   std::cout << "Node 1, interface 2 address is: ";
   iface_node_address.Print(std::cout);
   std::cout << std::endl;
+}
+
+void SetRedMode (Ptr<BundleProtocol> bpNode, uint8_t redMode)
+{
+  std::cout << Simulator::Now ().GetMilliSeconds () << " Setting Node " << bpNode->GetBpEndpointId ().Uri () << " red mode to " << (uint32_t) redMode << std::endl;
+  DynamicCast<ns3::BpLtpClaProtocol> (bpNode->GetCla ())->SetRedDataMode (redMode);
 }
 
 int
@@ -296,6 +303,8 @@ char data[] = "The Senate of the United States shall be composed of two Senators
                 " from Office, and disqualification to hold and enjoy any Office of honor, Trust or Profit"
                 " under the United States: but the Party convicted shall nevertheless be liable and subject"
                 " to Indictment, Trial, Judgment and Punishment, according to Law.";
+
+  Simulator::Schedule (Seconds (0.1), &SetRedMode, bpSenders.Get (0), 3); // RED_DATA_ALL = 3; RED_DATA_NONE = 0; RED_DATA_SLIM = 1; RED_DATA_REPORT_ROBUST = 2;
 
   // sending data bundle
   NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);

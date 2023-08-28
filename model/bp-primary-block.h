@@ -281,6 +281,13 @@ public:
      */
     json GetJson () const;
 
+    /**
+     * \brief Dump the primary bundle block to NS_LOG_FUNCTION
+     * 
+     * \return None
+    */
+    void dump () const;
+
     // TODO:  Add the rest of the getters
 
   /*

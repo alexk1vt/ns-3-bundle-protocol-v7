@@ -352,6 +352,10 @@ BundleProtocol::Send_data (const uint8_t* data, const uint32_t data_size, const 
       // Generate the CRC values
       bundle->GetPrimaryBlockPtr ()->GenerateCrcValue ();
       bundle->GetPayloadBlockPtr ()->GenerateCrcValue ();
+
+      // Reprime bundle with updated values
+      bundle->RebuildBundle ();
+      
       // store the bundle into persistant sent storage
       std::map<BpEndpointId, std::queue<Ptr<BpBundle> > >::iterator it = BpSendBundleStore.end ();
       it = BpSendBundleStore.find (src);
