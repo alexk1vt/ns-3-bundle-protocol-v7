@@ -179,6 +179,9 @@ public:
 
     void DumpAllButPayload() const;
 
+    void SetIsError (bool isError);
+    bool IsError () const;
+
     // TODO:  Add the rest of the getters
 
   /*
@@ -200,7 +203,8 @@ public:
         BLOCK_REPLICATED_EVERY_FRAGMENT      = 1 << 0,
         BLOCK_PROCESS_FAIL_REPORT_REQUEST    = 1 << 1,
         BLOCK_DELETE_BUNDLE_IF_NOT_PROCESSED = 1 << 2,
-        BLOCK_DISCARD_BLOCK_IF_NOT_PROCESSED = 1 << 4
+        BLOCK_DISCARD_BLOCK_IF_NOT_PROCESSED = 1 << 4,
+        BLOCK_IS_ERROR                       = 1 << 7 // Note: Not specified in RFC.  Using available flag bit
     } BlockProcessingFlags;
 
   /*

@@ -197,11 +197,6 @@ public:
      */
     void SetDeletionReportRequest (bool reportRequest);
 
-    /**
-     * \brief Rebuild the primary bundle block with current configured values
-    */
-    //void RebuildBlock ();
-
   // Getters
 
     /**
@@ -296,7 +291,7 @@ public:
         BUNDLE_RECEPTION_REPORT_REQUEST= 1 << 14,
         BUNDLE_FORWARD_REPORT_REQUEST  = 1 << 16,
         BUNDLE_DELIVERY_REPORT_REQUEST = 1 << 17,
-        BUNDLE_DELETION_REPORT_REQUEST = 1 << 18,
+        BUNDLE_DELETION_REPORT_REQUEST = 1 << 18
     };// BundleProcessingFlags;
 
   /*

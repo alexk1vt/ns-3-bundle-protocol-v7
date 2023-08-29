@@ -445,6 +445,16 @@ bool
 BpCanonicalBlock::CheckCrcValue () // false for mismatch/calculation error; true for crc match
 {
     NS_LOG_FUNCTION (this);
+    if (m_canonical_block.empty ())
+    {
+        NS_LOG_FUNCTION (this << " Canonical block is empty");
+        return false;
+    }
+    if (m_canonical_block[CANONICAL_BLOCK_FIELD_CRC_TYPE] == 0)
+    {
+        NS_LOG_FUNCTION (this << " Block has no CRC checking");
+        return true;
+    }
     if (!m_canonical_block.contains (CANONICAL_BLOCK_FIELD_CRC_VALUE))
     {
         NS_LOG_FUNCTION (this << " CRC value field not present in canonical block");
@@ -488,6 +498,27 @@ BpCanonicalBlock::IsEmpty () const
         return true;
     }
     return false;
+}
+
+void
+BpCanonicalBlock::SetIsError (bool isError)
+{
+    NS_LOG_FUNCTION (this << isError);
+    if (isError)
+    {
+        m_canonical_block[CANONICAL_BLOCK_FIELD_BLOCK_PROCESSING_FLAGS] = m_canonical_block[CANONICAL_BLOCK_FIELD_BLOCK_PROCESSING_FLAGS].get<uint64_t> () | static_cast<uint64_t>(BlockProcessingFlags::BLOCK_IS_ERROR); // NOTE: Not specified in RFC; using unassigned flag bit
+    }
+    else
+    {
+        m_canonical_block[CANONICAL_BLOCK_FIELD_BLOCK_PROCESSING_FLAGS] = m_canonical_block[CANONICAL_BLOCK_FIELD_BLOCK_PROCESSING_FLAGS].get<uint64_t> () & ~static_cast<uint64_t>(BlockProcessingFlags::BLOCK_IS_ERROR);
+    }
+}
+
+bool
+BpCanonicalBlock::IsError () const
+{
+    NS_LOG_FUNCTION (this);
+    return (m_canonical_block[CANONICAL_BLOCK_FIELD_BLOCK_PROCESSING_FLAGS].get<uint64_t> () & static_cast<uint64_t>(BlockProcessingFlags::BLOCK_IS_ERROR));  // NOTE: Not specified in RFC; using unassigned flag bit
 }
 
 } // namespace ns3

@@ -323,29 +323,7 @@ BpPrimaryBlock::SetDeletionReportRequest (bool reportRequest)
         m_primary_bundle_block[PRIMARY_BLOCK_FIELD_BUNDLE_PROCESSING_FLAGS] = m_primary_bundle_block[PRIMARY_BLOCK_FIELD_BUNDLE_PROCESSING_FLAGS].get<uint64_t> () & ~static_cast<uint64_t>(BundleProcessingFlags::BUNDLE_DELETION_REPORT_REQUEST);
     }
 }
-/*
-void
-BpPrimaryBlock::RebuildBlock ()
-{
-    NS_LOG_FUNCTION (this);
-    // rebuild the json primary block - ordering is specified in RFC 9171 and remains consistent with the order of the primary block fields
-    m_primary_bundle_block[PRIMARY_BLOCK_FIELD_VERSION] = m_version;
-    m_primary_bundle_block[PRIMARY_BLOCK_FIELD_BUNDLE_PROCESSING_FLAGS] = m_processingFlags;
-    m_primary_bundle_block[PRIMARY_BLOCK_FIELD_CRC_TYPE] = m_crcType;
-    m_primary_bundle_block[PRIMARY_BLOCK_FIELD_DESTINATION] = m_destEndpointId.Uri (); //GetEidString ();
-    m_primary_bundle_block[PRIMARY_BLOCK_FIELD_SOURCE] = m_sourceEndpointId.Uri (); //.GetEidString ();
-    m_primary_bundle_block[PRIMARY_BLOCK_FIELD_REPORT_TO] = m_reportToEndPointId.Uri (); //.GetEidString ();
-    m_primary_bundle_block[PRIMARY_BLOCK_FIELD_CREATION_TIMESTAMP] = m_creationTimestamp;
-    m_primary_bundle_block[PRIMARY_BLOCK_FIELD_LIFETIME] = m_lifetime;
-    if (m_processingFlags & BUNDLE_IS_FRAGMENT)
-    {
-        m_primary_bundle_block[PRIMARY_BLOCK_FIELD_FRAGMENT_OFFSET] = m_fragmentOffset;
-    }
-    m_primary_bundle_block[PRIMARY_BLOCK_FIELD_ADU_LENGTH] = m_aduLength;
-    //if (m_crcType != 0)
-    // TODO:  implement this
-}
-*/
+
 bool
 BpPrimaryBlock::IsFragment () const
 {

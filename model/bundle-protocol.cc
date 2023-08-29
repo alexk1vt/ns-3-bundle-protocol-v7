@@ -306,7 +306,7 @@ BundleProtocol::Send_data (const uint8_t* data, const uint32_t data_size, const 
   
   uint32_t total = data_size;
   uint32_t offset = 0;
-  bool fragment =  ( total > m_bundleSize ) ? true : false; // TO DO: Move fragmentation to CLA level - only CLA can make appropriate fragmentation decision based on transmitting protocol
+  bool fragment =  ( total > m_bundleSize ) ? true : false; 
   std::time_t timeStamp = std::time (NULL) - RFC_DATE_2000;
   uint8_t crcType = 1; // CRC-16
 
@@ -651,6 +651,7 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
     }
     // test if bundle is now complete
     NS_LOG_FUNCTION (this << " Checking for complete bundle");
+    bool isError = false;
     itBpFrag = BpRecvFragMap.find (FragName); // Retrieving the fragmentation map again in the event of a first fragment received
     u_int32_t CurrentBundleLength = 0;
     
@@ -659,11 +660,19 @@ BundleProtocol::ProcessBundle (Ptr<BpBundle> bundle)
     {
       NS_LOG_FUNCTION (this << "inspecting fragment: " << it.second);
       fragBpPayloadBlockPtr = it.second->GetPayloadBlockPtr ();
+      if (fragBpPayloadBlockPtr->IsError ())
+      {
+        isError = true;
+      }
       u_int32_t fragBpPayloadLength = fragBpPayloadBlockPtr->GetBlockDataSize ();
       CurrentBundleLength += fragBpPayloadLength;
       NS_LOG_FUNCTION (this << "Found fragment with block data size: " << fragBpPayloadLength << ". CurrentBundleLength: " << CurrentBundleLength);
     }
-    if (CurrentBundleLength != AduLength)
+    if (isError)
+    {
+      NS_LOG_FUNCTION (this << " Bundle fragment has error flag set. Attempting reassembly of what is available");
+    }
+    else if (CurrentBundleLength != AduLength)
     {
       // we do not have the complete bundle. Return and wait for rest of bundle fragments to come in
       NS_LOG_FUNCTION (this << " Have " << CurrentBundleLength << " out of " << AduLength << ". Waiting to receive rest");

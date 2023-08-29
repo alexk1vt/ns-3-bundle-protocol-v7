@@ -693,6 +693,15 @@ BpLtpClaProtocol::NotificationCallback (ns3::ltp::SessionId id,
                     NS_LOG_FUNCTION (this << " Receiver with engineID " << m_LtpEngineId << " passing bundle with CBOR size of " << assembledData.size() << " bytes to bundle protocol");
                     //m_bp->ReceiveCborVector (assembledData);
                     Ptr<BpBundle> assembledBundle = AssembleBundle (assembledData, RcvIt->second.rcvRedDataLength);
+                    if (assembledBundle->GetPayloadBlockPtr () == NULL) // There's no payload block so green data never made it
+                    {
+                        NS_LOG_FUNCTION (this << " Loss of green data. Dumping remaining block content into payload");
+                        std::string primaryBlockDump = "ERROR:  Loss of payload block. Dump of remaining blocks:\n" + assembledBundle->GetJson ().dump ();
+                        BpEndpointId blankEid = BpEndpointId ("dtn:none");
+                        Ptr<BpBundle> errorBundle = CreateObject<BpBundle> (0, blankEid, blankEid, primaryBlockDump.length (), reinterpret_cast<const uint8_t*>(primaryBlockDump.c_str ()));
+                        errorBundle->GetPayloadBlockPtr ()->SetIsError (true);
+                        assembledBundle->AddBlocksFromBundle (errorBundle, BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, false);
+                    }
                     if (!assembledBundle->empty())
                     {
                         m_bp->ReceiveBundle (assembledBundle);
@@ -803,13 +812,12 @@ BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
         Ptr<BpBundle> greenBundle = CreateObject<BpBundle> ();
         if ( greenBundle->SetBundleFromCbor (greenData) < 0 )
         {
-            NS_LOG_FUNCTION (this << " Error processing green bundle.  Dropping green portion and returning red bundle");
-            std::string redBlockDump = redBundle->GetJson ().dump ();
-            BpPrimaryBlock tempPrimaryBlock = BpPrimaryBlock ();
-            BpCanonicalBlock tempPayloadBlock = BpCanonicalBlock (BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, 1, 0, 0, redBlockDump.size (), reinterpret_cast<const uint8_t*>(redBlockDump.c_str ()));
-            Ptr<BpBundle> tempBundle = CreateObject<BpBundle> (0, tempPrimaryBlock, tempPayloadBlock);
-            redBundle->AddBlocksFromBundle (tempBundle, BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, false);
-
+            NS_LOG_FUNCTION (this << " Error processing green bundle.  Dump of remaining blocks:");
+            std::string redBlockDump = "ERROR:  Loss of payload block. Dump of remaining blocks:\n" + redBundle->GetJson ().dump ();
+            BpEndpointId blankEid = BpEndpointId ("dtn:none");
+            Ptr<BpBundle> errorBundle = CreateObject<BpBundle> (0, blankEid, blankEid, redBlockDump.length (), reinterpret_cast<const uint8_t*>(redBlockDump.c_str ()));
+            errorBundle->GetPayloadBlockPtr ()->SetIsError (true);
+            redBundle->AddBlocksFromBundle (errorBundle, BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, false);
             return redBundle;
         }
         // Have both red and green portions - combine them into a single bundle
@@ -817,12 +825,11 @@ BpLtpClaProtocol::AssembleBundle (std::vector<uint8_t> data, uint64_t redSize)
         if (redBundle->AddBlocksFromBundle(greenBundle) < 0)
         {
             NS_LOG_FUNCTION (this << " Error adding green portion to red bundle. Dropping green portion and returning red bundle");
-            std::string redBlockDump = redBundle->GetJson ().dump ();
-            BpPrimaryBlock tempPrimaryBlock = BpPrimaryBlock ();
-            BpCanonicalBlock tempPayloadBlock = BpCanonicalBlock (BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, 1, 0, 0, redBlockDump.size (), reinterpret_cast<const uint8_t*>(redBlockDump.c_str ()));
-            Ptr<BpBundle> tempBundle = CreateObject<BpBundle> (0, tempPrimaryBlock, tempPayloadBlock);
-            redBundle->AddBlocksFromBundle (tempBundle, BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, false);
-
+            std::string redBlockDump = "ERROR:  Loss of payload block. Dump of remaining blocks:\n" + redBundle->GetJson ().dump ();
+            BpEndpointId blankEid = BpEndpointId ("dtn:none");
+            Ptr<BpBundle> errorBundle = CreateObject<BpBundle> (0, blankEid, blankEid, redBlockDump.length (), reinterpret_cast<const uint8_t*>(redBlockDump.c_str ()));
+            errorBundle->GetPayloadBlockPtr ()->SetIsError (true);
+            redBundle->AddBlocksFromBundle (errorBundle, BpCanonicalBlock::BLOCK_TYPE_PAYLOAD, false);
             return redBundle;
         }
 
