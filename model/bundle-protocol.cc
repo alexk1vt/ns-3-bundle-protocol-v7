@@ -245,7 +245,7 @@ BundleProtocol::Register (const BpEndpointId &eid, const struct BpRegisterInfo &
   else
     {
       // duplicate registration
-      NS_FATAL_ERROR ("BundleProtocol::Register (): duplicate registration with endpoint id ");
+      NS_FATAL_ERROR ("BundleProtocol::Register (): duplicate registration with endpoint id " << eid.Uri ());
       return -1;
     }
 }

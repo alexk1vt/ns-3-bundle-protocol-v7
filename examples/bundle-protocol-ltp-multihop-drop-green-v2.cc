@@ -42,7 +42,7 @@
 
 using namespace ns3;
 
-NS_LOG_COMPONENT_DEFINE ("BundleProtocolLtpMultihopDropGreen");
+NS_LOG_COMPONENT_DEFINE ("BundleProtocolLtpMultihopDropGreenV2");
 
 void Send_char_array (Ptr<BundleProtocol> sender, char* data, BpEndpointId src, BpEndpointId dst)
 {
@@ -118,17 +118,17 @@ main (int argc, char *argv[])
   ns3::PacketMetadata::Enable ();
 
   NS_LOG_INFO ("Create bundle nodes.");
-  NodeContainer nodes, link1_nodes, link2_nodes, bp_nodes;
-  nodes.Create (3);
+  NodeContainer nodes, link1_nodes, link2_nodes, link3_nodes;
+  nodes.Create (4);
 
   link1_nodes.Add(nodes.Get(0));
   link1_nodes.Add(nodes.Get(1));
 
   link2_nodes.Add(nodes.Get(1));
   link2_nodes.Add(nodes.Get(2));
-
-  bp_nodes.Add(nodes.Get(0)); // the nodes that will have LTP and BP installed on them
-  bp_nodes.Add(nodes.Get(2));
+  
+  link3_nodes.Add(nodes.Get(2));
+  link3_nodes.Add(nodes.Get(3));
 
   NS_LOG_INFO ("Create channels.");
 
@@ -146,10 +146,10 @@ main (int argc, char *argv[])
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("500Kbps"));
   pointToPoint.SetChannelAttribute ("Delay", StringValue (channelDelay.str ()));
 
-  NetDeviceContainer link1_devices, link2_devices;
+  NetDeviceContainer link1_devices, link2_devices, link3_devices;
   link1_devices = pointToPoint.Install (link1_nodes);
   link2_devices = pointToPoint.Install (link2_nodes);
-
+  link3_devices = pointToPoint.Install (link3_nodes);
 
   NS_LOG_INFO ("Assign IP Addresses.");
   Ipv4AddressHelper ipv4;
@@ -160,17 +160,18 @@ main (int argc, char *argv[])
   ipv4.SetBase ("10.1.2.0", "255.255.255.0");
   Ipv4InterfaceContainer link2_i = ipv4.Assign (link2_devices);
 
+  ipv4.SetBase ("10.1.3.0", "255.255.255.0");
+  Ipv4InterfaceContainer link3_i = ipv4.Assign (link3_devices);
+
   Ptr<Ipv4> ipv4_node0 = link1_nodes.Get(0)->GetObject<Ipv4> ();
   Ptr<Ipv4StaticRouting> staticRouting_node0 = staticRoutingHelper.GetStaticRouting (ipv4_node0);
+
   staticRouting_node0->AddNetworkRouteTo (Ipv4Address ("0.0.0.0"), Ipv4Mask ("0.0.0.0"), 1); // setting node0 interface 1 as default route (interface 0 is loopback)
 
-  Ptr<Ipv4> ipv4_node2 = link2_nodes.Get(1)->GetObject<Ipv4> ();
-  Ptr<Ipv4StaticRouting> staticRouting_node2 = staticRoutingHelper.GetStaticRouting (ipv4_node2);
-  staticRouting_node2->AddNetworkRouteTo (Ipv4Address ("0.0.0.0"), Ipv4Mask ("0.0.0.0"), 1);  // setting node2 interface 1 as default route (interface 0 is loopback)
+  Ptr<Ipv4> ipv4_node3 = link3_nodes.Get(1)->GetObject<Ipv4> ();
+  Ptr<Ipv4StaticRouting> staticRouting_node3 = staticRoutingHelper.GetStaticRouting (ipv4_node3);
 
-  Ptr<Ipv4> ipv4_node1 = link1_nodes.Get (1)->GetObject<Ipv4> ();
-  ipv4_node1->SetForwarding (1, true); // setting node1 interface 1 as forwarding (interface 0 is loopback)
-  ipv4_node1->SetForwarding (2, true); // setting node1 interface 2 as forwarding (interface 0 is loopback)
+  staticRouting_node3->AddNetworkRouteTo (Ipv4Address ("0.0.0.0"), Ipv4Mask ("0.0.0.0"), 1);  // setting node3 interface 1 as default route (interface 0 is loopback)
 
   NS_LOG_INFO ("Create bundle applications.");
   // Now install LTP on the nodes
@@ -182,9 +183,7 @@ main (int argc, char *argv[])
   // Create LtpIpResolution tables to perform mappings between Ipv4 adresses and LtpEngineIDs
   // Receving node requires its own LtpIpResolutionTable because it maps the Forwarder's LtpEngineId to a different IP address than the Sender does
   Ptr<ns3::ltp::LtpIpResolutionTable> ltpRouting =  CreateObjectWithAttributes<ns3::ltp::LtpIpResolutionTable> ("Addressing", StringValue ("Ipv4"));
-  Ptr<ns3::ltp::LtpIpResolutionTable> ltpReceiverRouting =  CreateObjectWithAttributes<ns3::ltp::LtpIpResolutionTable> ("Addressing", StringValue ("Ipv4"));
-
-
+  
   // Use a helper to create and install Ltp Protocol instances in the nodes.  
   uint64_t baseLtpEngineId = 0;
   ns3::ltp::LtpProtocolHelper ltpHelper;
@@ -195,21 +194,34 @@ main (int argc, char *argv[])
   ltpHelper.SetLtpIpResolutionTable (ltpRouting);
   ltpHelper.SetBaseLtpEngineId (baseLtpEngineId);
   
-  // Pre-emptive bindings
-  //ltpHelper.AddBinding(0, link1_nodes.Get (1)->GetObject<Ipv4> ()->GetAddress (1,0).GetLocal (), 1113); // Add binding between LtpEngineId and Ipv4 address; 1113 is default server port
-  //std::cout << "Adding binding for node 0 Ltp Ip"
-  //ltpHelper.AddBinding(1, link2_nodes.Get (0)->GetObject<Ipv4> ()->GetAddress (2,0).GetLocal (), 1113); // Add binding between LtpEngineId and Ipv4 address; 1113 is default server port
-
-  ltpHelper.InstallAndLink (bp_nodes); // This installs Ltp and sets linking for one-way loop (node0 -> node1 -> node2 -> node0 -> ...)
+  ltpHelper.InstallAndLink (nodes); // This installs Ltp and sets linking for one-way loop (node0 -> node1 -> node2 -> node0 -> ...)
 
   // get node L4 addresses
   uint64_t senderL4addr = link1_nodes.Get (0)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
-  uint64_t recvL4addr = link2_nodes.Get (1)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
+  uint64_t forwarder1L4addr = link2_nodes.Get (0)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
+  uint64_t forwarder2L4addr = link2_nodes.Get (1)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
+  uint64_t recvL4addr = link3_nodes.Get (1)->GetObject<ns3::ltp::LtpProtocol> ()->GetLocalEngineId ();
 
-  // Create binding of Forwarder's link2 IP address to its LtpEngineId for the Receiver to use
-  //ltpReceiverRouting->AddBinding(forwarderL4addr, link2_i.GetAddress (0), 1113); // Add binding between LtpEngineId and Ipv4 address; 1113 is default server port
+  // Build reverse order links
+  ltpHelper.Link(link1_nodes.Get (1), senderL4addr);  // Link forwarder1 to Sender (node0 <- node1)
+  ltpHelper.Link(link2_nodes.Get (1), forwarder1L4addr); // Link forwarder2 to forwarder1 (node1 <- node2)
+  ltpHelper.Link(link2_nodes.Get (1), forwarder2L4addr); // Link Receiver to Forwarder2 (node1 <- node2)
+
+  Ptr<ns3::ltp::LtpIpResolutionTable> ltpReceiverRouting =  CreateObjectWithAttributes<ns3::ltp::LtpIpResolutionTable> ("Addressing", StringValue ("Ipv4"));
+  ltpReceiverRouting->AddBinding (forwarder2L4addr, link3_i.GetAddress (0), 1113); // Add binding between LtpEngineId and Ipv4 address; 1113 is default server port
+  Ptr<ns3::ltp::LtpIpResolutionTable> ltpSenderRouting = CreateObjectWithAttributes<ns3::ltp::LtpIpResolutionTable> ("Addressing", StringValue ("Ipv4"));
+  ltpSenderRouting->AddBinding (forwarder1L4addr, link1_i.GetAddress (1), 1113); // Add binding between forwarder1's link1 network IP and forwarder1's Ltp Engine Id
+  Ptr<ns3::ltp::LtpIpResolutionTable> ltpForwarderRouting = CreateObjectWithAttributes<ns3::ltp::LtpIpResolutionTable> ("Addressing", StringValue ("Ipv4"));
+  ltpForwarderRouting->AddBinding (forwarder1L4addr, link2_i.GetAddress (0), 1113);
+  ltpForwarderRouting->AddBinding (forwarder2L4addr, link2_i.GetAddress (1), 1113);
+  ltpForwarderRouting->AddBinding (senderL4addr, link1_i.GetAddress (0), 1113);
+  ltpForwarderRouting->AddBinding (recvL4addr, link3_i.GetAddress (1), 1113);
+
   // Set Receiver to use the LtpIpResolutionTable
-  //nodes.Get (2)->GetObject<ns3::ltp::LtpProtocol> ()->SetIpResolutionTable (ltpReceiverRouting); // Set the LtpIpResolutionTable for the Receiver node
+  link3_nodes.Get (1)->GetObject<ns3::ltp::LtpProtocol> ()->SetIpResolutionTable (ltpReceiverRouting); // Set the LtpIpResolutionTable for the Receiver node
+  link1_nodes.Get (0)->GetObject<ns3::ltp::LtpProtocol> ()->SetIpResolutionTable (ltpSenderRouting); // Set the LtpIpResolutionTable for the Sender node
+  link2_nodes.Get (0)->GetObject<ns3::ltp::LtpProtocol> ()->SetIpResolutionTable (ltpForwarderRouting); // Set the LtpIpResolutionTable for the Forwarder node
+  link2_nodes.Get (1)->GetObject<ns3::ltp::LtpProtocol> ()->SetIpResolutionTable (ltpForwarderRouting); // Set the LtpIpResolutionTable for the Forwarder node
 
   // Configure the BP nodes for LTP
   std::ostringstream l4type;
@@ -219,54 +231,86 @@ main (int argc, char *argv[])
   
   // build endpoint ids
   BpEndpointId eidSender ("dtn", "node0");
-  BpEndpointId eidRecv ("dtn", "node2");
+  BpEndpointId eidForwarder1 ("dtn", "node1");
+  BpEndpointId eidForwarder2 ("dtn", "node2");
+  BpEndpointId eidRecv ("dtn", "node3");
 
   // set bundle static routing for sender
   Ptr<BpStaticRoutingProtocol> route_sender = CreateObject<BpStaticRoutingProtocol> (); // static routes for sender
-  //route_sender->AddRoute (eidRecv, eidForwarder); // dest: recv; next_hop: forwarder
-
-  // set bundle static routing for recv
-  Ptr<BpStaticRoutingProtocol> route_recv = CreateObject<BpStaticRoutingProtocol> (); // static routes for recv
-  //route_recv->AddRoute (eidSender, eidForwarder); // dest: sender; next_hop: forwarder
+  route_sender->AddRoute (eidRecv, eidForwarder1); // dest: recv; next_hop: forwarder
+  Ptr<BpStaticRoutingProtocol> route_forwarder1 = CreateObject<BpStaticRoutingProtocol> ();
+  route_forwarder1->AddRoute (eidRecv, eidForwarder2); // dest: recv; next_hop: forwarder
+  Ptr<BpStaticRoutingProtocol> route_forwarder2 = CreateObject<BpStaticRoutingProtocol> ();
+  route_forwarder2->AddRoute (eidSender, eidForwarder1); // dest: recv; next_hop: recv
+  Ptr<BpStaticRoutingProtocol> route_recv = CreateObject<BpStaticRoutingProtocol> ();
+  route_recv->AddRoute (eidSender, eidForwarder2); // dest: sender; next_hop: forwarder
 
   // sender  
   BundleProtocolHelper bpSenderHelper;
+  //bpSenderHelper.SetRoutingProtocol (route);
   bpSenderHelper.SetRoutingProtocol (route_sender);
   bpSenderHelper.SetBpEndpointId (eidSender);
   BundleProtocolContainer bpSenders = bpSenderHelper.Install (link1_nodes.Get (0));
   bpSenders.Start (Seconds (0.2));
   bpSenders.Stop (Seconds (10.0));
 
+  // forwarder1
+  BundleProtocolHelper bpForwarder1Helper;
+  //bpForwarderHelper.SetRoutingProtocol (route);
+  bpForwarder1Helper.SetRoutingProtocol (route_forwarder1);
+  bpForwarder1Helper.SetBpEndpointId (eidForwarder1);
+  BundleProtocolContainer bpForwarders1 = bpForwarder1Helper.Install (link2_nodes.Get (0));
+  bpForwarders1.Start (Seconds (0.1));
+  bpForwarders1.Stop (Seconds (10.0));
+
+  // forwarder2
+  BundleProtocolHelper bpForwarder2Helper;
+  //bpForwarderHelper.SetRoutingProtocol (route);
+  bpForwarder2Helper.SetRoutingProtocol (route_forwarder2);
+  bpForwarder2Helper.SetBpEndpointId (eidForwarder2);
+  BundleProtocolContainer bpForwarders2 = bpForwarder2Helper.Install (link2_nodes.Get (1));
+  bpForwarders2.Start (Seconds (0.1));
+  bpForwarders2.Stop (Seconds (10.0));
 
   // receiver
   BundleProtocolHelper bpReceiverHelper;
   //bpReceiverHelper.SetRoutingProtocol (route);
   bpReceiverHelper.SetRoutingProtocol (route_recv);
   bpReceiverHelper.SetBpEndpointId (eidRecv);
-  BundleProtocolContainer bpReceivers = bpReceiverHelper.Install (link2_nodes.Get (1));
+  BundleProtocolContainer bpReceivers = bpReceiverHelper.Install (link3_nodes.Get (1));
   bpReceivers.Start (Seconds (0.0));
   bpReceivers.Stop (Seconds (10.0));
 
   // register external nodes with each node
-  Simulator::Schedule (Seconds (0.2), &Register, bpSenders.Get (0), eidRecv, recvL4addr);
+  Simulator::Schedule (Seconds (0), &Register, bpSenders.Get (0), eidForwarder1, forwarder1L4addr);
+  Simulator::Schedule (Seconds (0), &Register, bpSenders.Get (0), eidRecv, recvL4addr);
+
+  Simulator::Schedule (Seconds (0), &Register, bpForwarders1.Get (0), eidSender, senderL4addr);
+  Simulator::Schedule (Seconds (0), &Register, bpForwarders1.Get (0), eidForwarder2, forwarder2L4addr);
+  Simulator::Schedule (Seconds (0), &Register, bpForwarders1.Get (0), eidRecv, recvL4addr);
+
+  Simulator::Schedule (Seconds (0), &Register, bpForwarders2.Get (0), eidSender, senderL4addr);
+  Simulator::Schedule (Seconds (0), &Register, bpForwarders2.Get (0), eidForwarder1, forwarder1L4addr);
+  Simulator::Schedule (Seconds (0), &Register, bpForwarders2.Get (0), eidRecv, recvL4addr);
+
+  Simulator::Schedule (Seconds (0.0), &Register, bpReceivers.Get (0), eidForwarder2, forwarder2L4addr);
   Simulator::Schedule (Seconds (0.0), &Register, bpReceivers.Get (0), eidSender, senderL4addr);  
 
   // Get forwarder's link2 interface and set to down
-  Ptr<Ipv4L3Protocol> ipv4l3_node1 = link2_nodes.Get(0)->GetObject<Ipv4L3Protocol> ();
-  Ptr<Ipv4Interface> iface2_node1 = ipv4l3_node1->GetInterface(2);
+  Ptr<Ipv4Interface> node2_iface2 = link2_nodes.Get(1)->GetObject<Ipv4L3Protocol> ()->GetInterface(2);
 
   // Shutting node1 interface 2 down
-  Simulator::Schedule (Seconds (0.211), &Ipv4Interface::SetDown,iface2_node1);
+  Simulator::Schedule (Seconds (0.211), &Ipv4Interface::SetDown, node2_iface2);
 
-  /*
+
   char data[] = "Mr. Chairman, this movement is exclusively the work of politicians; "
                 "a set of men who have interests aside from the interests of the people, and who, "
                 "to say the most of them, are, taken as a mass, at least one long step removed from "
                 "honest men. I say this with the greater freedom because, being a politician myself, "
                 "none can regard it as personal.";
-  */
 
-  char data[] = "The Senate of the United States shall be composed of two Senators from each State, "
+/*
+char data[] = "The Senate of the United States shall be composed of two Senators from each State, "
                 "chosen by the Legislature thereof, for six Years; and each Senator shall have one Vote."
                 "Immediately after they shall be assembled in Consequence of the first Election, they shall"
                 " be divided as equally as may be into three Classes. The Seats of the Senators of the"
@@ -289,30 +333,29 @@ main (int argc, char *argv[])
                 " from Office, and disqualification to hold and enjoy any Office of honor, Trust or Profit"
                 " under the United States: but the Party convicted shall nevertheless be liable and subject"
                 " to Indictment, Trial, Judgment and Punishment, according to Law.";
-  
+  */
   // setting LTP red mode
-  Simulator::Schedule (Seconds (0.1), &SetRedMode, bpSenders.Get (0), 3); // 0 = no red data; 1 = slim red data; 2 = robust red data, 3 = all red data
+  Simulator::Schedule (Seconds (0.1), &SetRedMode, bpSenders.Get (0), 1); // 0 = no red data; 1 = slim red data; 2 = robust red data, 3 = all red data
 
   // sending data bundle
   NS_LOG_INFO ("Sending data of size: " << strlen(data) << std::endl);
-  Simulator::Schedule (Seconds (0.3), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);
-  Simulator::Schedule (Seconds (0.3), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);
+  Simulator::Schedule (Seconds (0.3), &Send_char_array, bpSenders.Get (0), data, eidSender, eidRecv);  
 
   // set forwarder's link2 interface to up
-  Simulator::Schedule (Seconds (1), &Ipv4Interface::SetUp,iface2_node1);
-
-  // receive function
-  Simulator::Schedule (Seconds (1.5), &Receive_char_array, bpReceivers.Get (0), eidRecv);
+  Simulator::Schedule (Seconds (1), &Ipv4Interface::SetUp, node2_iface2);
 
   // receive function
   //Simulator::Schedule (Seconds (3), &Receive_char_array, bpReceivers.Get (0), eidRecv);
   Simulator::Schedule (Seconds (0), &SetRecvCallback, bpReceivers.Get (0));
 
+  // receive function
+  Simulator::Schedule (Seconds (1.5), &Receive_char_array, bpReceivers.Get (0), eidRecv);
+
   if (tracing)
     {
       AsciiTraceHelper ascii;
-      pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("bundle-protocol-multihop-lsc-ltp.tr"));
-      pointToPoint.EnablePcapAll ("bundle-protocol-multihop-lsc-ltp", false);
+      pointToPoint.EnableAsciiAll (ascii.CreateFileStream ("bundle-protocol-ltp-multihop-droop-green-v2.tr"));
+      pointToPoint.EnablePcapAll ("bundle-protocol-ltp-multihop-droop-green-v2", false);
     }
 
   NS_LOG_INFO ("Run Simulation.");
