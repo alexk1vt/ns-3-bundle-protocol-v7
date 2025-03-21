@@ -21,6 +21,72 @@
  * BP-7 Author: Alexander Kedrowitsch <alexk1@vt.edu>
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: BpPrimaryBlock
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+  - Related commit message: LTP immediately drops green data even if there is no direct link available to send anything. Attempting to implement link status check in bp-ltp-cla to verify if link is available before passing to ltp.  All mechanisms are mostly in place, just need way to test if link is available
+
+Modified/Added Function: SetVersion
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+
+Modified/Added Function: SetDeletionReportRequest
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+  - Related commit message: corrected implementation of handling the loss of green data.  Will also notify receiver when correcupted fragment comes in. Dont have mechanism to dump remaining incoming fragments
+
+Modified/Added Function: SetPrimaryBlockFromJson
+  - Related commit message: LTP immediately drops green data even if there is no direct link available to send anything. Attempting to implement link status check in bp-ltp-cla to verify if link is available before passing to ltp.  All mechanisms are mostly in place, just need way to test if link is available
+
+Modified/Added Function: RebuildBlock
+  - Related commit message: LTP immediately drops green data even if there is no direct link available to send anything. Attempting to implement link status check in bp-ltp-cla to verify if link is available before passing to ltp.  All mechanisms are mostly in place, just need way to test if link is available
+
+Modified/Added Function: SetDestinationEid
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetSourceEid
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetReportEid
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetIsFragment
+  - Related commit message: implemented crc-16 for all blocks. Is enabled by default for primary and payload blocks; bundle will be dropped if calculation mismatch occurs during bundle reception
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetAduIsAdminRecord
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetDoNotFragment
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetAppAckRequest
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetStatusTimeRequest
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetReceptionReportRequest
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetForwardReportRequest
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetDeliveryReportRequest
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: GetCrcType
+  - Related commit message: implemented crc-16 for all blocks. Is enabled by default for primary and payload blocks; bundle will be dropped if calculation mismatch occurs during bundle reception
+
+Modified/Added Function: GetJson
+  - Related commit message: implemented crc-16 for all blocks. Is enabled by default for primary and payload blocks; bundle will be dropped if calculation mismatch occurs during bundle reception
+
+*/
+
 #include "ns3/log.h"
 #include "ns3/node.h"
 #include "bp-primary-block.h"

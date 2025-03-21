@@ -1,3 +1,20 @@
+"""
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: build
+  - Related commit message: bundle-protocol-multihop-tcp.cc is multi-hopping data between intervening node successfully.  However, BpRouting is not implemented correctly and needs to be updated.  As part of that, node registration needs to advise CLA of next-hop address to keep logic at appropriate levels.
+  - Related commit message: corrected implementation of handling the loss of green data.  Will also notify receiver when correcupted fragment comes in. Dont have mechanism to dump remaining incoming fragments
+  - Related commit message: some modified files since last commit. No idea what the changes were
+  - Related commit message: Have subsequent ltp transmission working for fragmented bundles when red data is used for two node scenarios.  Underlying ltp issues prevent other configurations from working.  Added multinode scenario to test transmission to multiple nodes in same network. Has not been properly coded yet.
+  - Related commit message: still having issues with inconsistent behavior with ltp. Believed to be poor memory management in my CLA. Need to investigate - using bundle-protocol-ltp-test.cc to do so
+  - Related commit message: including bundle-protocol-multihop-tcp.cc test scenario from Alex P.
+  - Related commit message: initial push for multi-hop branch. Will base test case off of tcp-large-transfer example
+  - Related commit message: Able to get multihop working further. Have remaining issue of new Ltp session ids being recognized as existing.  Will continue to work on it
+  - Related commit message: Having issues with multi-hop scenario with forwarder receiving all green data segments. Doesnt occur in simple scenario.  Occurs in simple scenario if OneWayLightTime is changed to 1ms.  Still unable to use Red Data.
+  - Related commit message: Added functionality for CLA to handle links not being available at time of sending.  Included example file to demonstrate.
+"""
 # -*- Mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8; -*-
 
 def build(bld):

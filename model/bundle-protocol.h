@@ -20,6 +20,13 @@
  * * BP-7 Author: Alexander Kedrowitsch <alexk1@vt.edu>
  * 
  */
+
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+*/
 #ifndef BUNDLE_PROTOCOL_H
 #define BUNDLE_PROTOCOL_H
 
@@ -136,7 +143,7 @@ public:
    * \brief Register a local endpoint id in the bundle protocol
    *
    *  This method adds an entry in the registration storage. If the state field 
-   *  in the BpRegisterInfo is ‚Äútrue‚Äù (active state),  which means that this 
+   *  in the BpRegisterInfo is ìtrueî (active state),  which means that this 
    *  application desires to receive bundles, it triggers the convergence layer 
    *  (CLA) protocol to enable a transport layer connection to receive packets 
    *  (e.g., listen state in TCP).

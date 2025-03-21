@@ -21,6 +21,63 @@
  * BP-7 Author: Alexander Kedrowitsch <alexk1@vt.edu>
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: NS_LOG_COMPONENT_DEFINE
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+
+Modified/Added Function: SetRetentionConstraint
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetPrimaryBlock
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetPayloadBlock
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: RebuildBundle
+  - Related commit message: successfully sending fragmented bundles over multihop. Am not yet dividing bundle primary block for LTP red-data. Am also not yet gracefully hanlding failed conversions from CBOR to JSON
+  - Related commit message: LTP immediately drops green data even if there is no direct link available to send anything. Attempting to implement link status check in bp-ltp-cla to verify if link is available before passing to ltp.  All mechanisms are mostly in place, just need way to test if link is available
+
+Modified/Added Function: SetBundleFromCbor
+  - Related commit message: successfully sending fragmented bundles over multihop. Am not yet dividing bundle primary block for LTP red-data. Am also not yet gracefully hanlding failed conversions from CBOR to JSON
+  - Related commit message: LTP immediately drops green data even if there is no direct link available to send anything. Attempting to implement link status check in bp-ltp-cla to verify if link is available before passing to ltp.  All mechanisms are mostly in place, just need way to test if link is available
+
+Modified/Added Function: PrintCborBytes
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+  - Related commit message: LTP immediately drops green data even if there is no direct link available to send anything. Attempting to implement link status check in bp-ltp-cla to verify if link is available before passing to ltp.  All mechanisms are mostly in place, just need way to test if link is available
+
+Modified/Added Function: BpBundle
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: GetPayloadBlock
+  - Related commit message: setting ADU to error message if bundle payload was lost or corrupted during transmission. Also added GetCla() method to bundle-protocol to allow direct manipulation of CLA settings by application - note: will need to dynamically cast the pointer to appropriate CLA class once received.
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: GetCborEncoding
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: AddBlocksFromBundle
+  - Related commit message: implemented crc-16 for all blocks. Is enabled by default for primary and payload blocks; bundle will be dropped if calculation mismatch occurs during bundle reception
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: AddToBundle
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: SetBundleFromJson
+  - Related commit message: implemented crc-16 for all blocks. Is enabled by default for primary and payload blocks; bundle will be dropped if calculation mismatch occurs during bundle reception
+
+Modified/Added Function: GetNewBlockNumber
+  - Related commit message: Corrected issue where updates to newly created bundles were not reflected in CBOR conversion under certain conditions
+
+*/
+
 #include "ns3/log.h"
 #include "ns3/node.h"
 #include "bp-bundle.h"

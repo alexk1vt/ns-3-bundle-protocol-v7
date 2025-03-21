@@ -19,6 +19,13 @@
  * Modified by Dizhi Zhou <dizhi.zhou@gmail.com>
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+*/
+
 #ifndef BUNDLE_PROTOCOL_CONTAINER_H
 #define BUNDLE_PROTOCOL_CONTAINER_H
 

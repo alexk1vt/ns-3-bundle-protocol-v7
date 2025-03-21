@@ -18,6 +18,20 @@
  * Author: Dizhi Zhou <dizhi.zhou@gmail.com>
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: DoRun
+  - Related commit message: renamed sdnv.h and all associated references to bp-sdnv.h to avoid conflict with LTP sdnv.h file.  Also updated test file to reflect Send_data and Receive_data interfaces.  Compiles successfully
+  - Related commit message: Updated test suite to match changes in BundleProtocol operation
+
+Modified/Added Function: Receive
+  - Related commit message: Updated test suite to match changes in BundleProtocol operation
+
+*/
+
 #include <string>
 #include <fstream>
 #include <tgmath.h>

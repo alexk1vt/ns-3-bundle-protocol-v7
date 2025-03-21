@@ -18,6 +18,23 @@
  * Author: Dizhi Zhou <dizhi.zhou@gmail.com>
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: SetBundleProtocol
+  - Related commit message: bundle-protocol-multihop-tcp.cc is multi-hopping data between intervening node successfully.  However, BpRouting is not implemented correctly and needs to be updated.  As part of that, node registration needs to advise CLA of next-hop address to keep logic at appropriate levels.
+  - Related commit message: Updated BP routing to operate at the BP node level. BP node registration now requires L3/L4 address for CLA to map node to address.  Currently only done withe explicity call to BundleProtocol::ExternalRegister(..)
+
+Modified/Added Function: AddRoute
+  - Related commit message: Updated BP routing to operate at the BP node level. BP node registration now requires L3/L4 address for CLA to map node to address.  Currently only done withe explicity call to BundleProtocol::ExternalRegister(..)
+
+Modified/Added Function: BpStaticRoutingProtocol
+  - Related commit message: still having issues with inconsistent behavior with ltp. Believed to be poor memory management in my CLA. Need to investigate - using bundle-protocol-ltp-test.cc to do so
+
+*/
+
 #include "bp-static-routing-protocol.h"
 #include "ns3/log.h"
 

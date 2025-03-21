@@ -11,19 +11,19 @@
     - `NS_LOG="BundleProtocol:BpTcpClaProtocol" ./waf --run bundle-protocol-multihop-tcp`
 - Bundle Protocol supports two L4 protocols: TCP and LTP (LTP rides on top of UDP with a server port number of 1113)
   - Written to operate with NS-3 LTP module: https://github.com/alexk1vt/ns-3-ltp
-- Nodes must have support L4 protocol installed prior to installing bundle protocol. To use LTP, nodes must have LTP installed and linked with all LTP ‘remote peers’ they will be communicating with.
+- Nodes must have support L4 protocol installed prior to installing bundle protocol. To use LTP, nodes must have LTP installed and linked with all LTP �remote peers� they will be communicating with.
 
 # Bundle-Protocol:
 ## Configurable parameters:
-- L4 type (“Ltp” and “Tcp” supported)
-- BundleSize – maximum size of ADU before bundle fragmentation
+- L4 type (�Ltp� and �Tcp� supported)
+- BundleSize � maximum size of ADU before bundle fragmentation
 
 ## Addressing:
 - Nodes are assigned bundle protocol endpoint IDs that are Uniform Resource Identifiers (URI) and follows the structure:
-    “scheme”:”scheme-specific part (ssp)” (ie, “dtn”:”node0”)
+    �scheme�:�scheme-specific part (ssp)� (ie, �dtn�:�node0�)
 
 ## Routing:
-- BP uses BpStaticRoutingProtocol class to look up ‘next hop’ for a given BP node
+- BP uses BpStaticRoutingProtocol class to look up �next hop� for a given BP node
   - No static routes need to be added to the class if routing to node that is directly connected
 
 ## Classes and Methods of Interest:
@@ -54,7 +54,7 @@ BundleProtocol::
 - Only supports singleton endpoint Ids at this time.
 - Does not provide mechanisms to control bundle and block processing flags.
 - Bundle Protocol Static Routing currently supports single routes.
-  - Branch ‘alternate-static-bp-routes-merged’ has an implementation of alternate static routes that is not thoroughly tested.
+  - Branch �alternate-static-bp-routes-merged� has an implementation of alternate static routes that is not thoroughly tested.
 - Some bundle data types are not RFC compliant, such as timestamps.
 - No reports or administrative records are implemented.
 - Bundle retention constraints are not implemented.

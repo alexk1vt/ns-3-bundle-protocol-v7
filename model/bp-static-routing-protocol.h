@@ -17,6 +17,13 @@
  *
  * Author: Dizhi Zhou <dizhi.zhou@gmail.com>
  */
+
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+*/
 #ifndef BP_STATIC_ROUTING_PROTOCOL_H
 #define BP_STATIC_ROUTING_PROTOCOL_H
 

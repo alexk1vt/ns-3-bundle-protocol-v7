@@ -1,4 +1,75 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
+/*
+ * Copyright (c) 2013 University of New Brunswick
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation;
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * Author: Alexander Kedrowitsch <alexk1@vt.edu>
+ */
+/*
+
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: SendBundle
+  - Related commit message: LTP immediately drops green data even if there is no direct link available to send anything. Attempting to implement link status check in bp-ltp-cla to verify if link is available before passing to ltp.  All mechanisms are mostly in place, just need way to test if link is available
+  - Related commit message: simple LTP example working with all data being sent as GRREN. Will implement larger examples.
+  - Related commit message: Have subsequent ltp transmission working for fragmented bundles when red data is used for two node scenarios.  Underlying ltp issues prevent other configurations from working.  Added multinode scenario to test transmission to multiple nodes in same network. Has not been properly coded yet.
+  - Related commit message: setting ADU to error message if bundle payload was lost or corrupted during transmission. Also added GetCla() method to bundle-protocol to allow direct manipulation of CLA settings by application - note: will need to dynamically cast the pointer to appropriate CLA class once received.
+  - Related commit message: still having issues with inconsistent behavior with ltp. Believed to be poor memory management in my CLA. Need to investigate - using bundle-protocol-ltp-test.cc to do so
+  - Related commit message: Fix compilation warnings
+  - Related commit message: Having issues with multi-hop scenario with forwarder receiving all green data segments. Doesnt occur in simple scenario.  Occurs in simple scenario if OneWayLightTime is changed to 1ms.  Still unable to use Red Data.
+  - Related commit message: Have working example of queuing multible bit vectors to send with LTP
+
+Modified/Added Function: SetSendCallback
+  - Related commit message: simple LTP example working with all data being sent as GRREN. Will implement larger examples.
+
+Modified/Added Function: GetTypeId
+  - Related commit message: Have bp-ltp-cla implemening link status checking prior to sending bunds to LTP since that module does not do so.  There is a watchdog timer that re-checks link statuses anytime links arent available at the start of bundle transmission.  Default is for 1 second
+  - Related commit message: Having issues with multi-hop scenario with forwarder receiving all green data segments. Doesnt occur in simple scenario.  Occurs in simple scenario if OneWayLightTime is changed to 1ms.  Still unable to use Red Data.
+
+Modified/Added Function: SetNotificationCallback
+  - Related commit message: Having issues with multi-hop scenario with forwarder receiving all green data segments. Doesnt occur in simple scenario.  Occurs in simple scenario if OneWayLightTime is changed to 1ms.  Still unable to use Red Data.
+
+Modified/Added Function: BpLtpClaProtocol
+  - Related commit message: still having issues with inconsistent behavior with ltp. Believed to be poor memory management in my CLA. Need to investigate - using bundle-protocol-ltp-test.cc to do so
+  - Related commit message: setting initial value of m_redDataMode to RED_DATA_SLIM for fragmented bundle or multihop scenarios to work out of the box
+
+Modified/Added Function: GetL4Address
+  - Related commit message: Able to get multihop working further. Have remaining issue of new Ltp session ids being recognized as existing.  Will continue to work on it
+
+Modified/Added Function: GetL4Socket
+  - Related commit message: Have bp-ltp-cla implemening link status checking prior to sending bunds to LTP since that module does not do so.  There is a watchdog timer that re-checks link statuses anytime links arent available at the start of bundle transmission.  Default is for 1 second
+
+Modified/Added Function: AssembleBundle
+  - Related commit message: Have bp-ltp-cla implemening link status checking prior to sending bunds to LTP since that module does not do so.  There is a watchdog timer that re-checks link statuses anytime links arent available at the start of bundle transmission.  Default is for 1 second
+  - Related commit message: corrected implementation of handling the loss of green data.  Will also notify receiver when correcupted fragment comes in. Dont have mechanism to dump remaining incoming fragments
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+  - Related commit message: added some code to help graceful failure when green data doesnt come across. Results in dump of red data contents into new payload block
+  - Related commit message: Completed implementation of receive bundle callbacks.  Nodes can register a callback function that will be called whenever they successfully process a bundle that is addressed to them
+
+Modified/Added Function: SetLinkStatusChangeCallback
+  - Related commit message: Have bp-ltp-cla implemening link status checking prior to sending bunds to LTP since that module does not do so.  There is a watchdog timer that re-checks link statuses anytime links arent available at the start of bundle transmission.  Default is for 1 second
+
+Modified/Added Function: CheckForBundleToSendFromTxQueue
+  - Related commit message: Have bp-ltp-cla implemening link status checking prior to sending bunds to LTP since that module does not do so.  There is a watchdog timer that re-checks link statuses anytime links arent available at the start of bundle transmission.  Default is for 1 second
+
+Modified/Added Function: ConnectionRequestFailedCallback
+  - Related commit message: Fix compilation warnings
+
+*/
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 
 #include "bp-ltp-cla-protocol.h"
 

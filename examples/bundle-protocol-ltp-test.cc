@@ -18,6 +18,16 @@
  * Adapted for Bundle-Protocol: Alex Kedrowitsch <alexk1@vt.edu>
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: main
+  - Related commit message: Have working example of queuing multible bit vectors to send with LTP
+
+*/
+
 //        Network topology
 //
 //       n0              n1

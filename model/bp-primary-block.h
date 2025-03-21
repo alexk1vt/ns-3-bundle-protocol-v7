@@ -20,6 +20,13 @@
  * 
  * BP-7 Author: Alexander Kedrowitsch <alexk1@vt.edu>
  */
+
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+*/
 #ifndef BP_PRIMARY_BLOCK_H
 #define BP_PRIMARY_BLOCK_H
 

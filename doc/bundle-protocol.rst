@@ -1,3 +1,9 @@
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+*/
 .. include:: replace.txt
 
 Bundle Protocol

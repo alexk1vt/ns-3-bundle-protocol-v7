@@ -18,6 +18,25 @@
  * Adapted for Bundle-Protocol: Alex Kedrowitsch <alexk1@vt.edu>
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: Receive_char_array
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+  - Related commit message: Completed implementation of receive bundle callbacks.  Nodes can register a callback function that will be called whenever they successfully process a bundle that is addressed to them
+
+Modified/Added Function: main
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+  - Related commit message: simple LTP example working with all data being sent as GRREN. Will implement larger examples.
+  - Related commit message: Have subsequent ltp transmission working for fragmented bundles when red data is used for two node scenarios.  Underlying ltp issues prevent other configurations from working.  Added multinode scenario to test transmission to multiple nodes in same network. Has not been properly coded yet.
+  - Related commit message: still having issues with inconsistent behavior with ltp. Believed to be poor memory management in my CLA. Need to investigate - using bundle-protocol-ltp-test.cc to do so
+  - Related commit message: Having issues with multi-hop scenario with forwarder receiving all green data segments. Doesnt occur in simple scenario.  Occurs in simple scenario if OneWayLightTime is changed to 1ms.  Still unable to use Red Data.
+  - Related commit message: Completed implementation of receive bundle callbacks.  Nodes can register a callback function that will be called whenever they successfully process a bundle that is addressed to them
+
+*/
+
 //        Network topology
 //
 //       n0              n1

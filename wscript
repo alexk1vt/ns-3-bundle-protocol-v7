@@ -1,3 +1,16 @@
+"""
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: build
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+  - Related commit message: implemented crc-16 for all blocks. Is enabled by default for primary and payload blocks; bundle will be dropped if calculation mismatch occurs during bundle reception
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: remove non-existant files from wscript
+  - Related commit message: renamed sdnv.h and all associated references to bp-sdnv.h to avoid conflict with LTP sdnv.h file.  Also updated test file to reflect Send_data and Receive_data interfaces.  Compiles successfully
+
+"""
 # -*- Mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8; -*-
 
 # def options(opt):

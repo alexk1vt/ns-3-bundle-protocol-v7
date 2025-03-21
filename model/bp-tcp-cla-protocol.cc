@@ -18,6 +18,86 @@
  * Author: Dizhi Zhou <dizhi.zhou@gmail.com>
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: GetL4Socket
+  - Related commit message: bundle-protocol-multihop-tcp.cc is multi-hopping data between intervening node successfully.  However, BpRouting is not implemented correctly and needs to be updated.  As part of that, node registration needs to advise CLA of next-hop address to keep logic at appropriate levels.
+  - Related commit message: Added functionality for CLA to handle links not being available at time of sending.  Included example file to demonstrate.
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+
+Modified/Added Function: SendPacket
+  - Related commit message: bundle-protocol-multihop-tcp.cc is multi-hopping data between intervening node successfully.  However, BpRouting is not implemented correctly and needs to be updated.  As part of that, node registration needs to advise CLA of next-hop address to keep logic at appropriate levels.
+  - Related commit message: Added functionality for CLA to handle links not being available at time of sending.  Included example file to demonstrate.
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+
+Modified/Added Function: EnableSend
+  - Related commit message: bundle-protocol-multihop-tcp.cc is multi-hopping data between intervening node successfully.  However, BpRouting is not implemented correctly and needs to be updated.  As part of that, node registration needs to advise CLA of next-hop address to keep logic at appropriate levels.
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+  - Related commit message: Updated BP routing to operate at the BP node level. BP node registration now requires L3/L4 address for CLA to map node to address.  Currently only done withe explicity call to BundleProtocol::ExternalRegister(..)
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+  - Related commit message: Added functionality for CLA to handle links not being available at time of sending.  Included example file to demonstrate.
+
+Modified/Added Function: EnableReceive
+  - Related commit message: Updated BP routing to operate at the BP node level. BP node registration now requires L3/L4 address for CLA to map node to address.  Currently only done withe explicity call to BundleProtocol::ExternalRegister(..)
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+
+Modified/Added Function: DataRecv
+  - Related commit message: Updated BP routing to operate at the BP node level. BP node registration now requires L3/L4 address for CLA to map node to address.  Currently only done withe explicity call to BundleProtocol::ExternalRegister(..)
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+
+Modified/Added Function: DisableReceive
+  - Related commit message: Added functionality for CLA to handle links not being available at time of sending.  Included example file to demonstrate.
+
+Modified/Added Function: SetL4SocketCallbacks
+  - Related commit message: Added functionality for CLA to handle links not being available at time of sending.  Included example file to demonstrate.
+
+Modified/Added Function: DataSent
+  - Related commit message: Added functionality for CLA to handle links not being available at time of sending.  Included example file to demonstrate.
+
+Modified/Added Function: getL4Address
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+  - Related commit message: Added functionality for CLA to handle links not being available at time of sending.  Included example file to demonstrate.
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+
+Modified/Added Function: GetRoutingProtocol
+  - Related commit message: Added functionality for CLA to handle links not being available at time of sending.  Included example file to demonstrate.
+
+Modified/Added Function: BpTcpClaProtocol
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+
+Modified/Added Function: RemoveL4Socket
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+
+Modified/Added Function: ConnectionSucceeded
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+
+Modified/Added Function: ConnectionFailed
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+
+Modified/Added Function: ErrorClose
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+
+Modified/Added Function: m_send
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+
+Modified/Added Function: SocketAddressSendQueueEmpty
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+
+Modified/Added Function: SetBundleProtocol
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+
+Modified/Added Function: RetrySocketConn
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+
+*/
+
 #include "ns3/log.h"
 #include "ns3/packet.h"
 #include "ns3/assert.h"

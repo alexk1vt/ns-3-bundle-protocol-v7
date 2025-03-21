@@ -19,6 +19,19 @@
  * Author: Gerard Garcia <ggarcia@deic.uab.cat>
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: Serialize
+  - Related commit message: renamed sdnv.h and all associated references to bp-sdnv.h to avoid conflict with LTP sdnv.h file.  Also updated test file to reflect Send_data and Receive_data interfaces.  Compiles successfully
+
+Modified/Added Function: Deserialize
+  - Related commit message: renamed sdnv.h and all associated references to bp-sdnv.h to avoid conflict with LTP sdnv.h file.  Also updated test file to reflect Send_data and Receive_data interfaces.  Compiles successfully
+
+*/
+
 #include "ns3/log.h"
 #include "ns3/node.h"
 #include "bp-header.h"

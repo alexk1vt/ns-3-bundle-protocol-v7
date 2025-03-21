@@ -14,6 +14,22 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: main
+  - Related commit message: Able to get multihop working further. Have remaining issue of new Ltp session ids being recognized as existing.  Will continue to work on it
+  - Related commit message: still having issues with inconsistent behavior with ltp. Believed to be poor memory management in my CLA. Need to investigate - using bundle-protocol-ltp-test.cc to do so
+  - Related commit message: Have subsequent ltp transmission working for fragmented bundles when red data is used for two node scenarios.  Underlying ltp issues prevent other configurations from working.  Added multinode scenario to test transmission to multiple nodes in same network. Has not been properly coded yet.
+  - Related commit message: Completed implementation of receive bundle callbacks.  Nodes can register a callback function that will be called whenever they successfully process a bundle that is addressed to them
+
+Modified/Added Function: Receive_char_array
+  - Related commit message: Completed implementation of receive bundle callbacks.  Nodes can register a callback function that will be called whenever they successfully process a bundle that is addressed to them
+
+*/
+
 // Network topology
 //
 //       n0 ----------- n1

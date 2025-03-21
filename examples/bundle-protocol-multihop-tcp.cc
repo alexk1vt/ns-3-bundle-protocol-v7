@@ -14,6 +14,28 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: Receive
+  - Related commit message: bundle-protocol-multihop-tcp.cc is multi-hopping data between intervening node successfully.  However, BpRouting is not implemented correctly and needs to be updated.  As part of that, node registration needs to advise CLA of next-hop address to keep logic at appropriate levels.
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+
+Modified/Added Function: main
+  - Related commit message: bundle-protocol-multihop-tcp.cc is multi-hopping data between intervening node successfully.  However, BpRouting is not implemented correctly and needs to be updated.  As part of that, node registration needs to advise CLA of next-hop address to keep logic at appropriate levels.
+  - Related commit message: Updated BP routing to operate at the BP node level. BP node registration now requires L3/L4 address for CLA to map node to address.  Currently only done withe explicity call to BundleProtocol::ExternalRegister(..)
+  - Related commit message: still having issues with inconsistent behavior with ltp. Believed to be poor memory management in my CLA. Need to investigate - using bundle-protocol-ltp-test.cc to do so
+  - Related commit message: Have all example scenarios working. Bundle is not yet RFC compliant without additional implementations
+
+Modified/Added Function: Receive_char_array
+  - Related commit message: Updated BP routing to operate at the BP node level. BP node registration now requires L3/L4 address for CLA to map node to address.  Currently only done withe explicity call to BundleProtocol::ExternalRegister(..)
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+  - Related commit message: Have all example scenarios working. Bundle is not yet RFC compliant without additional implementations
+
+*/
+
 // Network topology
 //
 //       n0 ----------- n1

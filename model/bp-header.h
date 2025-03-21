@@ -18,6 +18,13 @@
  * Author: Dizhi Zhou <dizhi.zhou@gmail.com>
  * Author: Gerard Garcia <ggarcia@deic.uab.cat>
  */
+
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+*/
 #ifndef BP_HEADER_H
 #define BP_HEADER_H
 

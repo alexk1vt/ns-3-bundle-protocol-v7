@@ -21,6 +21,103 @@
  * 
  */
 
+/*
+Updates made by: Alexander Kedrowitsch <alexk1@vt.edu>
+
+Aggregate changes for commits in range: ca769ae..f12268c
+
+Modified/Added Function: RetreiveBundle
+  - Related commit message: bundle-protocol-multihop-tcp.cc is multi-hopping data between intervening node successfully.  However, BpRouting is not implemented correctly and needs to be updated.  As part of that, node registration needs to advise CLA of next-hop address to keep logic at appropriate levels.
+  - Related commit message: successfully sending fragmented bundles over multihop. Am not yet dividing bundle primary block for LTP red-data. Am also not yet gracefully hanlding failed conversions from CBOR to JSON
+  - Related commit message: LTP immediately drops green data even if there is no direct link available to send anything. Attempting to implement link status check in bp-ltp-cla to verify if link is available before passing to ltp.  All mechanisms are mostly in place, just need way to test if link is available
+  - Related commit message: Updated BP routing to operate at the BP node level. BP node registration now requires L3/L4 address for CLA to map node to address.  Currently only done withe explicity call to BundleProtocol::ExternalRegister(..)
+  - Related commit message: implemented crc-16 for all blocks. Is enabled by default for primary and payload blocks; bundle will be dropped if calculation mismatch occurs during bundle reception
+  - Related commit message: Updated Send_packet(...) and various other functions for actual data to be sent through NS-3. bundle-protocol-simple.cc was updated to reflect sending a character array
+  - Related commit message: still working through CBOR implementation, just backing data up
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: still having issues with inconsistent behavior with ltp. Believed to be poor memory management in my CLA. Need to investigate - using bundle-protocol-ltp-test.cc to do so
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+  - Related commit message: simple LTP example working with all data being sent as GRREN. Will implement larger examples.
+
+Modified/Added Function: Receive
+  - Related commit message: bundle-protocol-multihop-tcp.cc is multi-hopping data between intervening node successfully.  However, BpRouting is not implemented correctly and needs to be updated.  As part of that, node registration needs to advise CLA of next-hop address to keep logic at appropriate levels.
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+  - Related commit message: Updated Send_packet(...) and various other functions for actual data to be sent through NS-3. bundle-protocol-simple.cc was updated to reflect sending a character array
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: Have all example scenarios working. Bundle is not yet RFC compliant without additional implementations
+
+Modified/Added Function: Bind
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: working on getting interface to pass files
+  - Related commit message: Have all example scenarios working. Bundle is not yet RFC compliant without additional implementations
+
+Modified/Added Function: SetBpEndpointId
+  - Related commit message: bundle-protocol-multihop-tcp.cc is multi-hopping data between intervening node successfully.  However, BpRouting is not implemented correctly and needs to be updated.  As part of that, node registration needs to advise CLA of next-hop address to keep logic at appropriate levels.
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+  - Related commit message: Updated BP routing to operate at the BP node level. BP node registration now requires L3/L4 address for CLA to map node to address.  Currently only done withe explicity call to BundleProtocol::ExternalRegister(..)
+
+Modified/Added Function: ProcessBundle
+  - Related commit message: bundle-protocol-multihop-tcp.cc is multi-hopping data between intervening node successfully.  However, BpRouting is not implemented correctly and needs to be updated.  As part of that, node registration needs to advise CLA of next-hop address to keep logic at appropriate levels.
+  - Related commit message: corrected implementation of handling the loss of green data.  Will also notify receiver when correcupted fragment comes in. Dont have mechanism to dump remaining incoming fragments
+  - Related commit message: pausing additional changes in order to roll-back bundle-protocol operations to original method but simply with basic CBOR encoding changes.  Will re-implement code changes after confirmed operation with original code solution.
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+  - Related commit message: Initial push for notify of bundle receiption callback implementation.  Compiles, need to incoprorate it into examples for testing.
+  - Related commit message: still working through CBOR implementation, just backing data up
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: setting ADU to error message if bundle payload was lost or corrupted during transmission. Also added GetCla() method to bundle-protocol to allow direct manipulation of CLA settings by application - note: will need to dynamically cast the pointer to appropriate CLA class once received.
+  - Related commit message: still having issues with inconsistent behavior with ltp. Believed to be poor memory management in my CLA. Need to investigate - using bundle-protocol-ltp-test.cc to do so
+  - Related commit message: bundle protocol now properly reconstructs fragmented packets.  Havent tested anything larger than 1998 bytes (5 fragmented TCP packets)
+  - Related commit message: Have all example scenarios working. Bundle is not yet RFC compliant without additional implementations
+  - Related commit message: Completed implementation of receive bundle callbacks.  Nodes can register a callback function that will be called whenever they successfully process a bundle that is addressed to them
+
+Modified/Added Function: GetBundle
+  - Related commit message: Updated BP routing to operate at the BP node level. BP node registration now requires L3/L4 address for CLA to map node to address.  Currently only done withe explicity call to BundleProtocol::ExternalRegister(..)
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+
+Modified/Added Function: Open
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+  - Related commit message: Have bp-ltp-cla implemening link status checking prior to sending bunds to LTP since that module does not do so.  There is a watchdog timer that re-checks link statuses anytime links arent available at the start of bundle transmission.  Default is for 1 second
+  - Related commit message: still working through CBOR implementation, just backing data up
+
+Modified/Added Function: ReceivePacket
+  - Related commit message: still working through CBOR implementation, just backing data up
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: Have all example scenarios working. Bundle is not yet RFC compliant without additional implementations
+  - Related commit message: still having issues with inconsistent behavior with ltp. Believed to be poor memory management in my CLA. Need to investigate - using bundle-protocol-ltp-test.cc to do so
+  - Related commit message: Fix compilation warnings
+  - Related commit message: simple LTP example working with all data being sent as GRREN. Will implement larger examples.
+
+Modified/Added Function: ForwardBundle
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: Have support for multiple extension blocks implemented as well as the 3 extension blocks defined in the RFC
+
+Modified/Added Function: GetNode
+  - Related commit message: have simple example working with cbor encoding. Need to re-implement fragmentation support and clean up commented out code.
+  - Related commit message: setting ADU to error message if bundle payload was lost or corrupted during transmission. Also added GetCla() method to bundle-protocol to allow direct manipulation of CLA settings by application - note: will need to dynamically cast the pointer to appropriate CLA class once received.
+
+Modified/Added Function: GetBpEndpointId
+  - Related commit message: Starting to get Ltp to cooperate. CLA and associated files are still a mess, need cleaning.  Having issue with Ltp protocol deserializing data - had to be sent as uint8_t vector.  Need to investigate
+
+Modified/Added Function: BundleProtocol
+  - Related commit message: still having issues with inconsistent behavior with ltp. Believed to be poor memory management in my CLA. Need to investigate - using bundle-protocol-ltp-test.cc to do so
+
+Modified/Added Function: Close
+  - Related commit message: LTP immediately drops green data even if there is no direct link available to send anything. Attempting to implement link status check in bp-ltp-cla to verify if link is available before passing to ltp.  All mechanisms are mostly in place, just need way to test if link is available
+
+Modified/Added Function: ReceiveCborVector
+  - Related commit message: LTP immediately drops green data even if there is no direct link available to send anything. Attempting to implement link status check in bp-ltp-cla to verify if link is available before passing to ltp.  All mechanisms are mostly in place, just need way to test if link is available
+
+Modified/Added Function: ProcessExtensionBlocks
+  - Related commit message: Initial push for notify of bundle receiption callback implementation.  Compiles, need to incoprorate it into examples for testing.
+  - Related commit message: Completed implementation of receive bundle callbacks.  Nodes can register a callback function that will be called whenever they successfully process a bundle that is addressed to them
+
+Modified/Added Function: DoDispose
+  - Related commit message: Initial push for notify of bundle receiption callback implementation.  Compiles, need to incoprorate it into examples for testing.
+  - Related commit message: Completed implementation of receive bundle callbacks.  Nodes can register a callback function that will be called whenever they successfully process a bundle that is addressed to them
+
+*/
+
 #include "ns3/log.h"
 #include "ns3/node.h"
 #include "ns3/packet.h"
