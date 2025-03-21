@@ -4,8 +4,11 @@
 
 # How to Use:
 - run from ns-allinone-3.34/ns-3.34/ with commands such as: 
-  - ./waf --run bundle-protocol-simple
-  - ./waf --run bundle-protocol-nocla
+  - `./waf --run bundle-protocol-simple`
+  - `./waf --run bundle-protocol-nocla`
+- Different branches have different capabilities, along with test scenarios to exercise them:
+  - Using 'multi-hop' branch while receiving debug output from the TCP covergence layer:
+    - `NS_LOG="BundleProtocol:BpTcpClaProtocol" ./waf --run bundle-protocol-multihop-tcp`
 - Bundle Protocol supports two L4 protocols: TCP and LTP (LTP rides on top of UDP with a server port number of 1113)
   - Written to operate with NS-3 LTP module: https://github.com/alexk1vt/ns-3-ltp
 - Nodes must have support L4 protocol installed prior to installing bundle protocol. To use LTP, nodes must have LTP installed and linked with all LTP ‘remote peers’ they will be communicating with.
